@@ -8,6 +8,11 @@ import (
 type Client struct {
 }
 
+func (c *Client) SetLevel(level logrus.Level) {
+	c.Infof("Setting level to ")
+	logrus.SetLevel(level)
+}
+
 // Infof ...
 func (c *Client) Infof(log string) {
 	logrus.Info(log)
