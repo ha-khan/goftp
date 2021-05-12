@@ -1,58 +1,59 @@
 package dispatcher
 
 import (
+	"fmt"
 	"goftp/logging"
 	"net"
 )
 
 type Client struct {
-	terminate chan struct{}
-	work      chan net.Conn
-	log       *logging.Client
+	log    *logging.Client
+	server net.Listener
 }
 
 func NewClient(log *logging.Client) *Client {
-	return &Client{terminate: make(chan struct{}, 1), log: log, work: make(chan net.Conn, 10)}
+	return &Client{log: log}
 }
 
+// Start kicks off the reactor loop for client control connections initiated by some
+// ftp client, essentially a tcp server that is expecting the telnet protocol
 func (c *Client) Start() {
+	var (
+		err  error
+		conn net.Conn
+	)
 
 	c.log.Infof("Dispatcher starting")
 
-	go func() {
-
-		ln, err := net.Listen("tcp", ":8080")
-		if err != nil {
-			// handle error
-		}
-
-		for {
-			conn, _ := ln.Accept()
-			c.work <- conn
-		}
-	}()
+	c.server, err = net.Listen("tcp", ":23")
+	if err != nil {
+		panic(err.Error())
+	}
 
 	for {
-		select {
-		case <-c.terminate:
-			// exit loop
-			c.log.Infof("Terminate Recv")
+		c.log.Infof("waiting for conn")
+		conn, err = c.server.Accept()
+		if err != nil {
+			fmt.Println(err.Error())
+			c.log.Infof("Stopping server")
 			return
-		case work := <-c.work:
-			go c.handleConnection(work)
 		}
+		go c.handleConnection(conn)
 	}
 
 }
 
 func (c *Client) Stop() {
 	c.log.Infof("Dispatcher stopping")
-	c.terminate <- struct{}{}
-	close(c.terminate)
+	c.server.Close()
+
 }
 
 func (c *Client) handleConnection(conn net.Conn) {
 	c.log.Infof("Connection recv")
+	var buffer []byte
+	_, _ = conn.Read(buffer)
+	fmt.Printf(string(buffer))
 	conn.Write([]byte("response\n"))
 	conn.Close()
 	c.log.Infof("Connection handled")
