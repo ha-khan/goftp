@@ -1,8 +1,8 @@
 package controller
 
 import (
-	"goftp/internals/dispatcher"
-	"goftp/logging"
+	"goftp/components/dispatcher"
+	"goftp/components/logger"
 	"sync"
 )
 
@@ -11,30 +11,33 @@ var goFtp *GoFTP
 
 // GoFTP is the singleton instance of this
 type GoFTP struct {
-	log *logging.Client
-
+	logger     logger.Client
 	dispatcher *dispatcher.Client
+	// TODO: create a worker *worker.Client which handles connections from dispatcher
+	//
 }
 
 // NewBasicGoFTP returns a basic GOFTP instance
 func NewBasicGoFTP() *GoFTP {
 	once.Do(func() {
-		var log *logging.Client
-		log = &logging.Client{}
-		goFtp = &GoFTP{log: log, dispatcher: dispatcher.NewClient(log)}
+		logger := logger.NewStdStreamClient()
+		goFtp = &GoFTP{
+			logger:     logger,
+			dispatcher: dispatcher.NewClient(logger),
+		}
 	})
+
 	return goFtp
 }
 
 // Start kicks off more Go routines which are expected to be running until the lifetime of the process
-func (g *GoFTP) Start() error {
-	g.log.Infof("Starting GoFTP")
+func (g *GoFTP) Start() {
+	g.logger.Infof("Starting GoFTP")
 	go g.dispatcher.Start()
-	return nil
 }
 
-// Stop stops
+// Stop stops all the internal components that
 func (g *GoFTP) Stop() {
-	g.log.Infof("Stopping GoFTP")
+	g.logger.Infof("Stopping GoFTP")
 	g.dispatcher.Stop()
 }

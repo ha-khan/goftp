@@ -3,18 +3,21 @@ package dispatcher
 import (
 	"bufio"
 	"fmt"
-	"goftp/logging"
+	"goftp/components/logger"
 	"io"
 	"net"
 )
 
 type Client struct {
-	log    *logging.Client
+	logger logger.Client
 	server net.Listener
+	port   string
 }
 
-func NewClient(log *logging.Client) *Client {
-	return &Client{log: log}
+func NewClient(log logger.Client) *Client {
+	return &Client{
+		logger: log,
+	}
 }
 
 // Start kicks off the reactor loop for client control connections initiated by some
@@ -25,39 +28,48 @@ func (c *Client) Start() {
 		conn net.Conn
 	)
 
-	c.log.Infof("Dispatcher starting")
+	c.logger.Infof("Dispatcher starting")
 
-	c.server, err = net.Listen("tcp", ":23")
+	c.server, err = net.Listen("tcp", ":2023")
 	if err != nil {
 		panic(err.Error())
 	}
 
 	for {
-		c.log.Infof("waiting for conn")
+		c.logger.Infof("waiting for conn")
 		conn, err = c.server.Accept()
 		if err != nil {
+			// TODO: need to rethink this scenario, main thread would still be blocking, should
+			//       probably throw panic to kill process
 			fmt.Println(err.Error())
-			c.log.Infof("Stopping server")
+			c.logger.Infof("Stopping server")
 			return
 		}
+
 		go c.handleConnection(conn)
 	}
-
 }
 
 func (c *Client) Stop() {
-	c.log.Infof("Dispatcher stopping")
+	c.logger.Infof("Dispatcher stopping")
 	c.server.Close()
-
 }
 
 /*
 This handles each control connection initiated by an FTP client (telnet essentially, so long running cli)
 
-from this a context should generated when a new go routine is spawned that initiates the data connection
+from this a context should be generated when a new go routine is spawned that initiates the data connection
 
 if the ftp client is trying to upload/download some file
 
+
+Need to figure out how to handle long running sessions based off of complex commands
+
+
+
+         The communication path between the USER-PI and SERVER-PI for
+         the exchange of commands and replies.  This connection follows
+         the Telnet Protocol.
 */
 func (c *Client) handleConnection(conn net.Conn) {
 
@@ -66,7 +78,7 @@ func (c *Client) handleConnection(conn net.Conn) {
 	// should for {... and parse/write back to this conn}
 	// Since telent essentially starts a "long running" CLI to issue commands that
 	// are generally understood by the FTP server
-	c.log.Infof("Connection recv")
+	c.logger.Infof("Connection recv")
 	var buffer []byte
 	var err error
 	defer conn.Close()
@@ -85,14 +97,14 @@ func (c *Client) handleConnection(conn net.Conn) {
 
 		switch buffer, err = bufio.NewReader(conn).ReadBytes('\n'); err {
 		case nil:
+			conn.Write(buffer)
 		case io.EOF:
-			c.log.Infof("Connection closed")
+			c.logger.Infof("Recvd EOF, Connection closed")
 			return
 		default:
-			c.log.Infof(fmt.Sprintf("Recv err %s", err.Error()))
+			c.logger.Infof(fmt.Sprintf("Recvd err %s, Connection Closed", err.Error()))
 			return
 		}
-		conn.Write(buffer)
 	}
 
 }

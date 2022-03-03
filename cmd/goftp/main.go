@@ -12,6 +12,8 @@ func main() {
 	var (
 		stop         chan os.Signal
 		appSingleton *controller.GoFTP
+		// TODO: figure out a good approach to configuring internal components
+		// port         = flag.String("port", "2023", "specify TCP port to expose ftp server on")
 	)
 
 	appSingleton = controller.NewBasicGoFTP()
