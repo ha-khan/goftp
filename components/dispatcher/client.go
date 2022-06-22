@@ -1,10 +1,8 @@
 package dispatcher
 
 import (
-	"bufio"
 	"fmt"
 	"goftp/components/logger"
-	"io"
 	"net"
 )
 
@@ -12,11 +10,13 @@ type Client struct {
 	logger logger.Client
 	server net.Listener
 	port   string
+	worker func(logger logger.Client, conn net.Conn)
 }
 
 func NewClient(log logger.Client) *Client {
 	return &Client{
 		logger: log,
+		worker: worker,
 	}
 }
 
@@ -46,7 +46,8 @@ func (c *Client) Start() {
 			return
 		}
 
-		go c.handleConnection(conn)
+		// potentially create a ctx here
+		go c.worker(c.logger, conn)
 	}
 }
 
@@ -71,40 +72,3 @@ Need to figure out how to handle long running sessions based off of complex comm
          the exchange of commands and replies.  This connection follows
          the Telnet Protocol.
 */
-func (c *Client) handleConnection(conn net.Conn) {
-
-	// start a context here
-
-	// should for {... and parse/write back to this conn}
-	// Since telent essentially starts a "long running" CLI to issue commands that
-	// are generally understood by the FTP server
-	c.logger.Infof("Connection recv")
-	var buffer []byte
-	var err error
-	defer conn.Close()
-	for {
-		//effectively Read doesn't know when to stop from the stream input
-		// we haven't specified a protocol yet, so there is no notion of knowing wh
-		// idea is to read what ever we can to a buffer intermediary
-		// then read from that buffer
-		// read, _ := conn.Read(buffer)
-		// if read > 0 {
-		// 	fmt.Println(buffer)
-		// 	return
-		// }
-		// //conn.Write([]byte("response\n"))
-		// conn.Write(buffer)
-
-		switch buffer, err = bufio.NewReader(conn).ReadBytes('\n'); err {
-		case nil:
-			conn.Write(buffer)
-		case io.EOF:
-			c.logger.Infof("Recvd EOF, Connection closed")
-			return
-		default:
-			c.logger.Infof(fmt.Sprintf("Recvd err %s, Connection Closed", err.Error()))
-			return
-		}
-	}
-
-}

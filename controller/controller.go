@@ -13,8 +13,6 @@ var goFtp *GoFTP
 type GoFTP struct {
 	logger     logger.Client
 	dispatcher *dispatcher.Client
-	// TODO: create a worker *worker.Client which handles connections from dispatcher
-	//
 }
 
 // NewBasicGoFTP returns a basic GOFTP instance
