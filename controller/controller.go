@@ -15,8 +15,8 @@ type GoFTP struct {
 	dispatcher *dispatcher.Client
 }
 
-// NewBasicGoFTP returns a basic GOFTP instance
-func NewBasicGoFTP() *GoFTP {
+// BasicGoFTP returns a basic GOFTP instance
+func BasicGoFTP() *GoFTP {
 	once.Do(func() {
 		logger := logger.NewStdStreamClient()
 		goFtp = &GoFTP{

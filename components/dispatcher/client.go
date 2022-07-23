@@ -3,6 +3,7 @@ package dispatcher
 import (
 	"fmt"
 	"goftp/components/logger"
+	"goftp/components/worker"
 	"net"
 )
 
@@ -10,26 +11,19 @@ type Client struct {
 	logger logger.Client
 	server net.Listener
 	port   string
-	worker func(logger logger.Client, conn net.Conn)
 }
 
 func NewClient(log logger.Client) *Client {
 	return &Client{
 		logger: log,
-		worker: worker,
 	}
 }
 
-// Start kicks off the reactor loop for client control connections initiated by some
-// ftp client, essentially a tcp server that is expecting the telnet protocol
+// Start kicks off the reactor loop for each control connections initiated by some ftp client
 func (c *Client) Start() {
-	var (
-		err  error
-		conn net.Conn
-	)
-
 	c.logger.Infof("Dispatcher starting")
 
+	var err error
 	c.server, err = net.Listen("tcp", ":2023")
 	if err != nil {
 		panic(err.Error())
@@ -37,38 +31,29 @@ func (c *Client) Start() {
 
 	for {
 		c.logger.Infof("waiting for conn")
-		conn, err = c.server.Accept()
+
+		conn, err := c.server.Accept()
 		if err != nil {
+			// write back to connection that error with server
+
 			// TODO: need to rethink this scenario, main thread would still be blocking, should
 			//       probably throw panic to kill process
 			fmt.Println(err.Error())
 			c.logger.Infof("Stopping server")
+
 			return
 		}
 
-		// potentially create a ctx here
-		go c.worker(c.logger, conn)
+		go worker.NewWorker(c.logger).Start(conn)
 	}
 }
 
 func (c *Client) Stop() {
 	c.logger.Infof("Dispatcher stopping")
+	// todo, need to keep track of all outstanding workers
+	// which themselves have a connection that they are processing
+	// can close gracefully or keep them alive until the client closes them
+	// regardless the dispatcher needs to stop accepting new connections at a
+	// minimum
 	c.server.Close()
 }
-
-/*
-This handles each control connection initiated by an FTP client (telnet essentially, so long running cli)
-
-from this a context should be generated when a new go routine is spawned that initiates the data connection
-
-if the ftp client is trying to upload/download some file
-
-
-Need to figure out how to handle long running sessions based off of complex commands
-
-
-
-         The communication path between the USER-PI and SERVER-PI for
-         the exchange of commands and replies.  This connection follows
-         the Telnet Protocol.
-*/

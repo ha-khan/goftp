@@ -1,2 +1,3 @@
 # Overview
-curl telnet://localhost:2023
+
+A pure Go implementation of [RFC 959](https://www.rfc-editor.org/rfc/rfc959)
