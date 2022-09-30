@@ -18,23 +18,22 @@ import (
 type Worker struct {
 	logger logger.Client
 
-	// usernames -> passwords
-	users    map[string]string
-	loggedIn bool
-	// TODO: need to keep track of current user
-	// that is to be logged in. since the password
-	// request will be decoupled in an other req/resp pair
+	// keeps track of currently logged in users
+	users       map[string]string
+	currentUser string
+	loggedIn    bool
 
 	// present working directory
 	pwd string
 }
 
-func NewWorker(l logger.Client) *Worker {
+func New(l logger.Client) *Worker {
 	return &Worker{
 		logger: l,
 		users: map[string]string{
 			"hkhan": "password",
 		},
+		pwd: "/usr/local/temp",
 	}
 }
 
@@ -42,11 +41,12 @@ func NewWorker(l logger.Client) *Worker {
 // of the client initiated control connection
 func (w *Worker) Start(conn net.Conn) {
 	w.logger.Infof("Connection recv")
-	var buffer []byte
-	var err error
 	defer conn.Close()
+	defer w.logger.Infof("Closing conn")
+	//
+	//
+	// reply to client that we're ready to start processing requests
 	conn.Write(ServiceReady.Byte())
-
 	reader := bufio.NewReader(conn)
 	for {
 		//
@@ -54,7 +54,7 @@ func (w *Worker) Start(conn net.Conn) {
 		// https://developer.mozilla.org/en-US/docs/Glossary/CRLF
 		//
 		//
-		buffer, err = reader.ReadBytes('\n')
+		buffer, err := reader.ReadBytes('\n')
 		if err != nil {
 			fmt.Println(fmt.Sprintf("%s", err.Error()))
 			conn.Close()
@@ -63,18 +63,19 @@ func (w *Worker) Start(conn net.Conn) {
 
 		handler, req, err := w.Parse(string(buffer))
 		if err != nil {
-			fmt.Println(fmt.Sprintf("%s", err.Error()))
+			fmt.Println(fmt.Sprintf("Parsing Error: %s", err.Error()))
 			// TODO: need to handle this scenario
 			//       and not cont
 		}
 
-		// grab response from handler also
-		var resp Response
-		resp, err = handler(req)
+		resp, err := handler(req)
 		if err != nil {
 			w.logger.Infof(fmt.Sprintf("Error: %s", err.Error()))
 		}
 
 		conn.Write(resp.Byte())
+		if resp == UserQuit {
+			return
+		}
 	}
 }

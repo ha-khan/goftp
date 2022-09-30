@@ -11,6 +11,8 @@ type Client struct {
 	logger logger.Client
 	server net.Listener
 	port   string
+
+	// cancelFunc
 }
 
 func NewClient(log logger.Client) *Client {
@@ -38,13 +40,15 @@ func (c *Client) Start() {
 
 			// TODO: need to rethink this scenario, main thread would still be blocking, should
 			//       probably throw panic to kill process
+			//       can invoke some cancel context passed to each worker to finish processing a
+			//       request
 			fmt.Println(err.Error())
 			c.logger.Infof("Stopping server")
 
 			return
 		}
 
-		go worker.NewWorker(c.logger).Start(conn)
+		go worker.New(c.logger).Start(conn)
 	}
 }
 

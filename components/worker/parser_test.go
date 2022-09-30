@@ -6,7 +6,7 @@ import (
 )
 
 func Test_Parse(t *testing.T) {
-	w := NewWorker(logger.NewStdStreamClient())
+	w := New(logger.NewStdStreamClient())
 	_, _, err := w.Parse("USER hkhan\r\n")
 	if err != nil {
 		t.Errorf("Expected nil")

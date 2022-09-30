@@ -19,7 +19,7 @@ func (w *Worker) Parse(request string) (Handler, *Request, error) {
 	switch str := strings.Split(request, " "); len(str) {
 	case 2:
 		req = &Request{
-			Cmd: string(str[0]),
+			Cmd: strings.ToUpper(string(str[0])),
 			Arg: string(str[1][:len(str[1])-2]),
 		}
 	case 1:
@@ -36,8 +36,12 @@ func (w *Worker) Parse(request string) (Handler, *Request, error) {
 	switch req.Cmd {
 	case "USER":
 		return w.handleUserLogin, req, nil
+	case "PASS":
+		return w.handleUserPassword, req, nil
 	case "PWD":
-		handler = nil
+		handler = w.handlePWD
+	case "QUIT":
+		return w.handleQuit, req, nil
 	default:
 		return nil, req, fmt.Errorf("Invaled CMD: %s", req.Cmd)
 	}
