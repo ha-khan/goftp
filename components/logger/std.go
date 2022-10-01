@@ -30,6 +30,6 @@ func (s *stdStreamClient) SetLevel() {
 }
 
 // Infof ...
-func (s *stdStreamClient) Infof(log string) {
-	s.Println(log)
+func (s *stdStreamClient) Infof(msg string) {
+	s.Println(msg)
 }

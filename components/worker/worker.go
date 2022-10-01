@@ -38,7 +38,8 @@ func New(l logger.Client) *Worker {
 }
 
 // Start will kick off the this workers processing
-// of the client initiated control connection
+// of the client initiated "control connection"
+// used to issue
 func (w *Worker) Start(conn net.Conn) {
 	w.logger.Infof("Connection recv")
 	defer conn.Close()
@@ -63,9 +64,7 @@ func (w *Worker) Start(conn net.Conn) {
 
 		handler, req, err := w.Parse(string(buffer))
 		if err != nil {
-			fmt.Println(fmt.Sprintf("Parsing Error: %s", err.Error()))
-			// TODO: need to handle this scenario
-			//       and not cont
+			w.logger.Infof(fmt.Sprintf("Parsing Error: %s", err.Error()))
 		}
 
 		resp, err := handler(req)

@@ -27,7 +27,7 @@ func (w *Worker) Parse(request string) (Handler, *Request, error) {
 			Cmd: string(str[0][:len(str[0])-2]),
 		}
 	default:
-		return nil, nil, fmt.Errorf("Unable to parse request")
+		return w.handleSyntaxErrorParams, req, fmt.Errorf("Unable to parse request")
 
 	}
 
@@ -40,10 +40,20 @@ func (w *Worker) Parse(request string) (Handler, *Request, error) {
 		return w.handleUserPassword, req, nil
 	case "PWD":
 		handler = w.handlePWD
+	case "STOR":
+		return nil, nil, nil
+	case "RETR":
+		return nil, nil, nil
+	case "DELE":
+		return nil, nil, nil
 	case "QUIT":
 		return w.handleQuit, req, nil
+	case "ACCT", "CWD", "CDUP", "SMNT", "REIN", "PORT", "PASV", "TYPE",
+		"STRU", "MODE", "STOU", "APPE", "ALLO", "REST", "RNFR", "RNTO",
+		"ABOR", "RMD", "MKD", "LIST", "NLST", "SITE", "SYST", "STAT", "HELP", "NOOP":
+		return w.handleCmdNotImplemented, req, nil
 	default:
-		return nil, req, fmt.Errorf("Invaled CMD: %s", req.Cmd)
+		return w.handleSyntaxErrorInvalidCmd, req, fmt.Errorf("Invaled CMD: %s", req.Cmd)
 	}
 
 	return w.checkIfLoggedIn(handler), nil, nil

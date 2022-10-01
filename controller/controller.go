@@ -12,7 +12,7 @@ var goFtp *GoFTP
 // GoFTP is the singleton instance of this
 type GoFTP struct {
 	logger     logger.Client
-	dispatcher *dispatcher.Client
+	dispatcher *dispatcher.Dispatcher
 }
 
 // BasicGoFTP returns a basic GOFTP instance
@@ -21,7 +21,7 @@ func BasicGoFTP() *GoFTP {
 		logger := logger.NewStdStreamClient()
 		goFtp = &GoFTP{
 			logger:     logger,
-			dispatcher: dispatcher.NewClient(logger),
+			dispatcher: dispatcher.New(logger),
 		}
 	})
 

@@ -41,10 +41,22 @@ func (w *Worker) handleUserPassword(req *Request) (Response, error) {
 	return NotLoggedIn, fmt.Errorf("incorrect password received for username %s", w.currentUser)
 }
 
-func (w *Worker) handlePWD(req *Request) (Response, error) {
+func (w Worker) handlePWD(req *Request) (Response, error) {
 	return Response(fmt.Sprintf(string(DirectoryResponse), w.pwd)), nil
 }
 
-func (w *Worker) handleQuit(req *Request) (Response, error) {
+func (w Worker) handleQuit(req *Request) (Response, error) {
 	return UserQuit, nil
+}
+
+func (w Worker) handleSyntaxErrorParams(req *Request) (Response, error) {
+	return SyntaxError2, nil
+}
+
+func (w Worker) handleSyntaxErrorInvalidCmd(req *Request) (Response, error) {
+	return SyntaxError1, nil
+}
+
+func (w Worker) handleCmdNotImplemented(req *Request) (Response, error) {
+	return CmdNotImplemented, nil
 }

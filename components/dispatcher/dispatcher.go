@@ -7,7 +7,7 @@ import (
 	"net"
 )
 
-type Client struct {
+type Dispatcher struct {
 	logger logger.Client
 	server net.Listener
 	port   string
@@ -15,26 +15,27 @@ type Client struct {
 	// cancelFunc
 }
 
-func NewClient(log logger.Client) *Client {
-	return &Client{
+// TODO: make more configurable such as TLS TCP server
+func New(log logger.Client) *Dispatcher {
+	return &Dispatcher{
 		logger: log,
 	}
 }
 
 // Start kicks off the reactor loop for each control connections initiated by some ftp client
-func (c *Client) Start() {
-	c.logger.Infof("Dispatcher starting")
+func (d *Dispatcher) Start() {
+	d.logger.Infof("Dispatcher starting")
 
 	var err error
-	c.server, err = net.Listen("tcp", ":2023")
+	d.server, err = net.Listen("tcp", ":2023")
 	if err != nil {
 		panic(err.Error())
 	}
 
 	for {
-		c.logger.Infof("waiting for conn")
+		d.logger.Infof("waiting for conn")
 
-		conn, err := c.server.Accept()
+		conn, err := d.server.Accept()
 		if err != nil {
 			// write back to connection that error with server
 
@@ -43,21 +44,21 @@ func (c *Client) Start() {
 			//       can invoke some cancel context passed to each worker to finish processing a
 			//       request
 			fmt.Println(err.Error())
-			c.logger.Infof("Stopping server")
+			d.logger.Infof("Stopping server")
 
 			return
 		}
 
-		go worker.New(c.logger).Start(conn)
+		go worker.New(d.logger).Start(conn)
 	}
 }
 
-func (c *Client) Stop() {
-	c.logger.Infof("Dispatcher stopping")
+func (d *Dispatcher) Stop() {
+	d.logger.Infof("Dispatcher stopping")
 	// todo, need to keep track of all outstanding workers
 	// which themselves have a connection that they are processing
 	// can close gracefully or keep them alive until the client closes them
 	// regardless the dispatcher needs to stop accepting new connections at a
 	// minimum
-	c.server.Close()
+	d.server.Close()
 }
