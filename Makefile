@@ -1,13 +1,16 @@
-build: cmd/goftp/main.go
-	go build cmd/goftp/main.go
-	cp ./main ./bin
-	rm ./main
+container_work_dir = /go/src/app
 
-test:
-	go test -v
+run:
+	docker-compose up
+
+build-dev:
+	WORK_DIR=$(container_work_dir) docker build -f Dockerfile.dev . --tag dev
+
+build:
+	WORK_DIR=$(container_work_dir) docker build . --tag goftp/prod
+
+build-binary:
+	CGO_ENABLED=0 go build -o bin/main ./cmd/goftp/main.go
 
 clean:
-	rm ./bin/* 
-
-image:
-	build
+	rm -f ./bin/*

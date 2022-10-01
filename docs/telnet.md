@@ -1,7 +1,5 @@
 # Overview
 
-## Telnet
-
 Layer 7 protocol over TCP, meant to comm with some remote process and issue commands and such via a terminal interface. 
 
 RFC 959 references telnet being utilized during the control connection phase where FTP clients can issue cmds that setup the state of the connection (PWD, User Name / Password, ... etc)

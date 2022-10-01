@@ -49,12 +49,12 @@ func (w *Worker) Parse(request string) (Handler, *Request, error) {
 	case "QUIT":
 		return w.handleQuit, req, nil
 	case "ACCT", "CWD", "CDUP", "SMNT", "REIN", "PORT", "PASV", "TYPE",
-		"STRU", "MODE", "STOU", "APPE", "ALLO", "REST", "RNFR", "RNTO",
-		"ABOR", "RMD", "MKD", "LIST", "NLST", "SITE", "SYST", "STAT", "HELP", "NOOP":
-		return w.handleCmdNotImplemented, req, nil
+		"STRU", "MODE", "STOU", "APPE", "ALLO", "REST", "RNFR", "RNTO", "HELP",
+		"ABOR", "RMD", "MKD", "LIST", "NLST", "SITE", "SYST", "STAT", "NOOP":
+		handler = w.handleCmdNotImplemented
 	default:
 		return w.handleSyntaxErrorInvalidCmd, req, fmt.Errorf("Invaled CMD: %s", req.Cmd)
 	}
 
-	return w.checkIfLoggedIn(handler), nil, nil
+	return w.checkIfLoggedIn(handler), req, nil
 }

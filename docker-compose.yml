@@ -1,0 +1,5 @@
+services:
+    go-app:
+        image: goftp/prod:latest
+        ports: 
+            - 2023:2023
