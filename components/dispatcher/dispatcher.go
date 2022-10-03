@@ -10,7 +10,10 @@ import (
 type Dispatcher struct {
 	logger logger.Client
 	server net.Listener
-	port   string
+
+	// control connection port
+	// usually 21
+	port string
 
 	// cancelFunc
 }

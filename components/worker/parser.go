@@ -31,7 +31,8 @@ func (w *Worker) Parse(request string) (Handler, *Request, error) {
 
 	}
 
-	// find appropriate handler
+	w.logger.Infof(req.String())
+
 	var handler Handler
 	switch req.Cmd {
 	case "USER":
@@ -40,16 +41,20 @@ func (w *Worker) Parse(request string) (Handler, *Request, error) {
 		return w.handleUserPassword, req, nil
 	case "PWD":
 		handler = w.handlePWD
+	case "TYPE":
+		handler = w.handleType
+	case "PASV":
+		handler = w.handlePassive
 	case "STOR":
 		return nil, nil, nil
 	case "RETR":
-		return nil, nil, nil
+		handler = w.handleRetrieve
 	case "DELE":
 		return nil, nil, nil
 	case "QUIT":
 		return w.handleQuit, req, nil
-	case "ACCT", "CWD", "CDUP", "SMNT", "REIN", "PORT", "PASV", "TYPE",
-		"STRU", "MODE", "STOU", "APPE", "ALLO", "REST", "RNFR", "RNTO", "HELP",
+	case "ACCT", "CWD", "CDUP", "SMNT", "REIN", "PORT", "HELP",
+		"STRU", "MODE", "STOU", "APPE", "ALLO", "REST", "RNFR", "RNTO",
 		"ABOR", "RMD", "MKD", "LIST", "NLST", "SITE", "SYST", "STAT", "NOOP":
 		handler = w.handleCmdNotImplemented
 	default:
