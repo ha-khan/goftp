@@ -16,6 +16,7 @@ type Dispatcher struct {
 	port string
 
 	// cancelFunc
+	// TODO: store connection pool for PASV
 }
 
 // TODO: make more configurable such as TLS TCP server

@@ -17,21 +17,39 @@ import (
 // ftp connections are terminated at will by the client
 // need to keep track of session information, which is done by using a struct
 type Worker struct {
+	//
+	// Info, Debug
 	logger logger.Client
-
+	//
 	// keeps track of currently logged in users
 	users       map[string]string
 	currentUser string
 	loggedIn    bool
-
+	//
+	//
 	// present working directory, clients are unable to
 	// move outside of pwd, which is considered the
 	// "root" directory set at initialization time
 	pwd string
-
-	// stream, block
-	mode string
-
+	//
+	//
+	// F - File (no record structure)
+	// R - Record structure
+	// P - Page structure
+	structure rune
+	//
+	//
+	// S - stream
+	// B - block
+	// C - compress
+	mode rune
+	//
+	//
+	//
+	reprType rune
+	//
+	//
+	//
 	// allows communication of spawned data transfer port go routine
 	// this worker will feed bytes which will be sent
 	// through the channel, when done the shutdown (cancel) func
@@ -53,18 +71,14 @@ func New(l logger.Client) *Worker {
 			"hkhan": "password",
 		},
 		pwd: "/temp",
-		//
-		//
-		//
 		connection: make(chan struct {
 			socket net.Conn
 			err    error
 		}),
-		shutdown: func() {},
-		//
-		//
-		// returns either err or nil for STOR/RETR operations
-		done: make(chan error),
+		shutdown:  func() {},
+		done:      make(chan error),
+		mode:      'S',
+		structure: 'F',
 	}
 }
 

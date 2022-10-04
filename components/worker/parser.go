@@ -53,10 +53,12 @@ func (w *Worker) Parse(request string) (Handler, *Request, error) {
 		return nil, nil, nil
 	case "LIST":
 		return nil, nil, nil
+	case "MODE":
+		return nil, nil, nil
 	case "QUIT":
 		return w.handleQuit, req, nil
 	case "ACCT", "CWD", "CDUP", "SMNT", "REIN", "PORT", "HELP",
-		"STRU", "MODE", "STOU", "APPE", "ALLO", "REST", "RNFR", "RNTO",
+		"STRU", "STOU", "APPE", "ALLO", "REST", "RNFR", "RNTO",
 		"ABOR", "RMD", "MKD", "NLST", "SITE", "SYST", "STAT", "NOOP":
 		handler = w.handleCmdNotImplemented
 	default:
