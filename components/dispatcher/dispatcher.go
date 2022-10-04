@@ -48,7 +48,6 @@ func (d *Dispatcher) Start() {
 			//       request
 			fmt.Println(err.Error())
 			d.logger.Infof("Stopping server")
-
 			return
 		}
 
@@ -58,7 +57,7 @@ func (d *Dispatcher) Start() {
 
 func (d *Dispatcher) Stop() {
 	d.logger.Infof("Dispatcher stopping")
-	// todo, need to keep track of all outstanding workers
+	// TODO:, need to keep track of all outstanding workers
 	// which themselves have a connection that they are processing
 	// can close gracefully or keep them alive until the client closes them
 	// regardless the dispatcher needs to stop accepting new connections at a

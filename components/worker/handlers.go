@@ -1,9 +1,12 @@
 package worker
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"net"
+	"os"
 )
 
 type Handler func(*Request) (Response, error)
@@ -113,45 +116,75 @@ PASSIVE (PASV)
 func (w *Worker) handlePassive(req *Request) (Response, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	w.shutdown = cancel
-
-	ready := make(chan struct{}) // avoid possible race
+	ready := make(chan error)
 	go func() {
 		server, err := net.Listen("tcp", ":2024")
+		ready <- err
 		if err != nil {
-			panic(err.Error())
+			return
 		}
-		ready <- struct{}{}
 
 		conn, err := server.Accept()
-		if err != nil {
-			panic(err.Error())
+		w.connection <- struct {
+			socket net.Conn
+			err    error
+		}{
+			conn,
+			err,
 		}
 
-		defer func() {
-			w.logger.Infof("Closing Data Connection")
-			conn.Close()
-			server.Close()
-		}()
-
-		w.logger.Infof("Starting PASV")
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case data := <-w.stream:
-				conn.Write(data)
-			}
-		}
+		<-ctx.Done()
+		w.logger.Infof("Closing Data Connection")
+		conn.Close()
+		server.Close()
 	}()
 
-	<-ready
+	if err := <-ready; err != nil {
+		return CannotOpenDataConnection, err
+	}
+
 	return PassiveMode, nil
 }
 
+/*
+will attempt to open file at PWD/req.Arg
+
+TODO: this method needs to be a generic reader of bytes, can't
+use a scanner which assumes underlying bytes are text and will
+have \n to stop each scan
+*/
 func (w *Worker) handleRetrieve(req *Request) (Response, error) {
 	go func() {
-		w.stream <- []byte("Hello this is a test\n")
+		fd, err := os.Open("./" + w.pwd + "/" + req.Arg)
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+
+		conn := <-w.connection
+		if conn.err != nil {
+			w.shutdown()
+			w.done <- conn.err
+			return
+		}
+
+		scanner := bufio.NewScanner(fd)
+		for scanner.Scan() {
+			conn.socket.Write(append(scanner.Bytes(), []byte("\n")...))
+		}
+
+		w.shutdown()
+		w.done <- nil
+	}()
+
+	return StartTransfer, nil
+}
+
+func (w *Worker) handleStore(req *Request) (Response, error) {
+	go func() {
+		conn := <-w.connection
+
+		bytes, _ := io.ReadAll(conn.socket)
+		fmt.Print(string(bytes))
 		w.shutdown()
 		w.done <- nil
 	}()

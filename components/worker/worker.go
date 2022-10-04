@@ -12,7 +12,7 @@ import (
 //
 // in RFC 959 terms, this worker would be known as the Server-PI,
 // ftp is a request/response protocol and each read (request) will have its write (response)
-// after synchronous execution of the handler is done
+// execution of the handler is done
 //
 // ftp connections are terminated at will by the client
 // need to keep track of session information, which is done by using a struct
@@ -29,11 +29,17 @@ type Worker struct {
 	// "root" directory set at initialization time
 	pwd string
 
+	// stream, block
+	mode string
+
 	// allows communication of spawned data transfer port go routine
 	// this worker will feed bytes which will be sent
 	// through the channel, when done the shutdown (cancel) func
 	// will be invoked
-	stream   chan []byte
+	connection chan struct {
+		socket net.Conn
+		err    error
+	}
 	shutdown func()
 
 	// signals whether STOR/RETR finished successfully or not
@@ -46,9 +52,19 @@ func New(l logger.Client) *Worker {
 		users: map[string]string{
 			"hkhan": "password",
 		},
-		pwd:    "/temp",
-		stream: make(chan []byte),
-		done:   make(chan error),
+		pwd: "/temp",
+		//
+		//
+		//
+		connection: make(chan struct {
+			socket net.Conn
+			err    error
+		}),
+		shutdown: func() {},
+		//
+		//
+		// returns either err or nil for STOR/RETR operations
+		done: make(chan error),
 	}
 }
 
@@ -58,7 +74,7 @@ func New(l logger.Client) *Worker {
 func (w *Worker) Start(conn net.Conn) {
 	w.logger.Infof("Connection recv")
 	defer conn.Close()
-	defer w.logger.Infof("Closing conn")
+	defer w.logger.Infof("Closing Control Connection")
 	//
 	//
 	// reply to client that we're ready to start processing requests
@@ -82,14 +98,17 @@ func (w *Worker) Start(conn net.Conn) {
 			w.logger.Infof(fmt.Sprintf("Handler Error: %s", err.Error()))
 		}
 
-		// TODO: create a better approach to handle more complex FTP commands
-		conn.Write(resp.Byte())
-		if resp == UserQuit {
+		// TODO: certain commands require more complex interactions
+		// compared to simple configuration or state information
+		//
+		switch conn.Write(resp.Byte()); resp {
+		case UserQuit:
 			return
-		}
-		if resp == StartTransfer {
-			<-w.done // wait for done
+		case StartTransfer:
+			// TODO: need to handle errors
+			<-w.done
 			conn.Write(TransferComplete.Byte())
+		default:
 		}
 	}
 }
