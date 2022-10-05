@@ -56,6 +56,10 @@ func (w Worker) handleQuit(req *Request) (Response, error) {
 	return UserQuit, nil
 }
 
+func (w Worker) handleNoop(req *Request) (Response, error) {
+	return CommandOK, nil
+}
+
 func (w Worker) handleSyntaxErrorParams(req *Request) (Response, error) {
 	return SyntaxError2, nil
 }
@@ -98,6 +102,14 @@ REPRESENTATION TYPE (TYPE)
 */
 func (w *Worker) handleType(req *Request) (Response, error) {
 	return CommandOK, nil
+}
+
+func (w *Worker) handleMode(req *Request) (Response, error) {
+	return "", nil
+}
+
+func (w *Worker) handleStrucure(req *Request) (Response, error) {
+	return "", nil
 }
 
 /*
@@ -217,22 +229,23 @@ func (w *Worker) handlePort(req *Request) (Response, error) {
 /*
 will attempt to open file at PWD/req.Arg
 
-TODO: this method needs to be a generic reader of bytes, can't
-use a scanner which assumes underlying bytes are text and will
-have \n to stop each scan
+TODO: Need to take into account the TYPE command
+
+	if TYPE A, we can use a generic scanner, else
 */
 func (w *Worker) handleRetrieve(req *Request) (Response, error) {
 	go func() {
+		defer w.shutdown()
+
 		fd, err := os.Open("./" + w.pwd + "/" + req.Arg)
 		if err != nil {
-			fmt.Println(err.Error())
+			w.transferComplete <- err
+			return
 		}
 
 		conn := <-w.connection
 		if conn.err != nil {
-			w.logger.Infof(conn.err.Error())
-			w.shutdown()
-			w.done <- conn.err
+			w.transferComplete <- conn.err
 			return
 		}
 
@@ -241,8 +254,7 @@ func (w *Worker) handleRetrieve(req *Request) (Response, error) {
 			conn.socket.Write(append(scanner.Bytes(), []byte("\n")...))
 		}
 
-		w.shutdown()
-		w.done <- nil
+		w.transferComplete <- nil
 	}()
 
 	return StartTransfer, nil
@@ -250,12 +262,11 @@ func (w *Worker) handleRetrieve(req *Request) (Response, error) {
 
 func (w *Worker) handleStore(req *Request) (Response, error) {
 	go func() {
+		defer w.shutdown()
 		conn := <-w.connection
-
 		bytes, _ := io.ReadAll(conn.socket)
 		fmt.Print(string(bytes))
-		w.shutdown()
-		w.done <- nil
+		w.transferComplete <- nil
 	}()
 
 	return StartTransfer, nil

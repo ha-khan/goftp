@@ -28,7 +28,6 @@ func (w *Worker) Parse(request string) (Handler, *Request, error) {
 		}
 	default:
 		return w.handleSyntaxErrorParams, req, fmt.Errorf("Unable to parse request")
-
 	}
 
 	w.logger.Infof(req.String())
@@ -43,6 +42,8 @@ func (w *Worker) Parse(request string) (Handler, *Request, error) {
 		handler = w.handlePWD
 	case "TYPE":
 		handler = w.handleType
+	case "MODE":
+		handler = w.handleMode
 	case "PASV":
 		handler = w.handlePassive
 	case "PORT":
@@ -55,13 +56,13 @@ func (w *Worker) Parse(request string) (Handler, *Request, error) {
 		return nil, nil, nil
 	case "LIST":
 		return nil, nil, nil
-	case "MODE":
-		return nil, nil, nil
+	case "NOOP":
+		handler = w.handleNoop
 	case "QUIT":
 		return w.handleQuit, req, nil
 	case "ACCT", "CWD", "CDUP", "SMNT", "REIN", "HELP",
 		"STRU", "STOU", "APPE", "ALLO", "REST", "RNFR", "RNTO",
-		"ABOR", "RMD", "MKD", "NLST", "SITE", "SYST", "STAT", "NOOP":
+		"ABOR", "RMD", "MKD", "NLST", "SITE", "SYST", "STAT":
 		handler = w.handleCmdNotImplemented
 	default:
 		return w.handleSyntaxErrorInvalidCmd, req, fmt.Errorf("Invaled CMD: %s", req.Cmd)

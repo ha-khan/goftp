@@ -17,39 +17,33 @@ import (
 // ftp connections are terminated at will by the client
 // need to keep track of session information, which is done by using a struct
 type Worker struct {
-	//
-	// Info, Debug
 	logger logger.Client
-	//
+
 	// keeps track of currently logged in users
 	users       map[string]string
 	currentUser string
 	loggedIn    bool
-	//
-	//
+
 	// present working directory, clients are unable to
 	// move outside of pwd, which is considered the
 	// "root" directory set at initialization time
 	pwd string
-	//
+
+	// Transfer Parameters
 	//
 	// F - File (no record structure)
 	// R - Record structure
 	// P - Page structure
-	structure rune
+	stru rune
+	// S - Stream
+	// B - Block
+	// C - Compress
+	mo rune
 	//
-	//
-	// S - stream
-	// B - block
-	// C - compress
-	mode rune
-	//
-	//
-	//
-	reprType rune
-	//
-	//
-	//
+	// A - ASCII
+	// I - Image
+	ty rune
+
 	// allows communication of spawned data transfer port go routine
 	// this worker will feed bytes which will be sent
 	// through the channel, when done the shutdown (cancel) func
@@ -61,7 +55,8 @@ type Worker struct {
 	shutdown func()
 
 	// signals whether STOR/RETR finished successfully or not
-	done chan error
+	// either passive
+	transferComplete chan error
 }
 
 func New(l logger.Client) *Worker {
@@ -75,53 +70,60 @@ func New(l logger.Client) *Worker {
 			socket net.Conn
 			err    error
 		}),
-		shutdown:  func() {},
-		done:      make(chan error),
-		mode:      'S',
-		structure: 'F',
+		shutdown:         func() {},
+		transferComplete: make(chan error),
+		mo:               'S', // Stream
+		stru:             'F', // File
+		ty:               'A', // ASCII
 	}
 }
 
 // Start will kick off the this workers processing
-// of the client initiated "control connection"
-// used to issue
+// of the client initiated control connection
+//
+// much of the core logic that drives the control connection is
+// handled here such as errors, responses, and more complex workflows
+// such as the actual transfer of bytes across the data connection
+//
+// errors are rarely
+//
+// TODO: break this into two streams, receiver cmds, and responding
 func (w *Worker) Start(conn net.Conn) {
-	w.logger.Infof("Connection recv")
-	defer conn.Close()
-	defer w.logger.Infof("Closing Control Connection")
-	//
-	//
-	// reply to client that we're ready to start processing requests
+	defer func() {
+		w.logger.Infof("Closing Control Connection")
+		conn.Close()
+	}()
+
+	// reply to ftp client that we're ready to start processing requests
 	conn.Write(ServiceReady.Byte())
 	reader := bufio.NewReader(conn)
 	for {
 		buffer, err := reader.ReadBytes('\n')
 		if err != nil {
-			fmt.Println(fmt.Sprintf("%s", err.Error()))
-			conn.Close()
+			w.logger.Infof(fmt.Sprintf("Connection Buffer Read Error: %v", err))
 			return
 		}
 
 		handler, req, err := w.Parse(string(buffer))
 		if err != nil {
-			w.logger.Infof(fmt.Sprintf("Parsing Error: %s", err.Error()))
+			w.logger.Infof(fmt.Sprintf("Parsing Error: %v", err))
 		}
 
 		resp, err := handler(req)
 		if err != nil {
-			w.logger.Infof(fmt.Sprintf("Handler Error: %s", err.Error()))
+			w.logger.Infof(fmt.Sprintf("Handler Error: %v", err))
 		}
 
-		// TODO: certain commands require more complex interactions
-		// compared to simple configuration or state information
-		//
 		switch conn.Write(resp.Byte()); resp {
 		case UserQuit:
 			return
 		case StartTransfer:
-			// TODO: need to handle errors
-			<-w.done
-			conn.Write(TransferComplete.Byte())
+			if err = <-w.transferComplete; err != nil {
+				w.logger.Infof(fmt.Sprintf("Transfer Error: %v", err))
+				// TODO: write back that transfer failed
+			} else {
+				conn.Write(TransferComplete.Byte())
+			}
 		default:
 		}
 	}

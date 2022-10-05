@@ -37,7 +37,7 @@ func (d *Dispatcher) Start() {
 	}
 
 	for {
-		d.logger.Infof("waiting for conn")
+		d.logger.Infof("Waiting for connection")
 
 		conn, err := d.server.Accept()
 		if err != nil {
