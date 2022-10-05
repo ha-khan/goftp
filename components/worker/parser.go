@@ -45,6 +45,8 @@ func (w *Worker) Parse(request string) (Handler, *Request, error) {
 		handler = w.handleType
 	case "PASV":
 		handler = w.handlePassive
+	case "PORT":
+		handler = w.handlePort
 	case "STOR":
 		handler = w.handleStore
 	case "RETR":
@@ -57,7 +59,7 @@ func (w *Worker) Parse(request string) (Handler, *Request, error) {
 		return nil, nil, nil
 	case "QUIT":
 		return w.handleQuit, req, nil
-	case "ACCT", "CWD", "CDUP", "SMNT", "REIN", "PORT", "HELP",
+	case "ACCT", "CWD", "CDUP", "SMNT", "REIN", "HELP",
 		"STRU", "STOU", "APPE", "ALLO", "REST", "RNFR", "RNTO",
 		"ABOR", "RMD", "MKD", "NLST", "SITE", "SYST", "STAT", "NOOP":
 		handler = w.handleCmdNotImplemented

@@ -7,6 +7,8 @@ import (
 	"io"
 	"net"
 	"os"
+	"strconv"
+	"strings"
 )
 
 type Handler func(*Request) (Response, error)
@@ -166,7 +168,50 @@ DATA PORT (PORT)
 	address.
 */
 func (w *Worker) handlePort(req *Request) (Response, error) {
-	return "", nil
+	ctx, cancel := context.WithCancel(context.Background())
+	w.shutdown = cancel
+	ready := make(chan error)
+	go func() {
+		strs := strings.Split(req.Arg, ",")
+
+		MSB, err := strconv.Atoi(strs[4])
+		if err != nil {
+			ready <- err
+			return
+		}
+
+		LSB, err := strconv.Atoi(strs[5])
+		if err != nil {
+			ready <- err
+			return
+		}
+		port := uint16(MSB)<<8 + uint16(LSB)
+
+		conn, err := net.Dial("tcp", strings.Join(strs[:4], ".")+":"+fmt.Sprintf("%d", port))
+		if err != nil {
+			ready <- err
+			return
+		}
+
+		ready <- nil
+		defer conn.Close()
+		w.connection <- struct {
+			socket net.Conn
+			err    error
+		}{
+			conn,
+			err,
+		}
+
+		<-ctx.Done()
+		w.logger.Infof("Closing Data Connection")
+	}()
+
+	if err := <-ready; err != nil {
+		return CannotOpenDataConnection, err
+	}
+
+	return CommandOK, nil
 }
 
 /*
@@ -185,6 +230,7 @@ func (w *Worker) handleRetrieve(req *Request) (Response, error) {
 
 		conn := <-w.connection
 		if conn.err != nil {
+			w.logger.Infof(conn.err.Error())
 			w.shutdown()
 			w.done <- conn.err
 			return

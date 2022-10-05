@@ -11,5 +11,7 @@ if __name__ == '__main__':
         # client.retrlines('RETR main.txt')
         with open('main.txt', 'wb') as fd:
             client.retrbinary('RETR main.txt', fd.write)
-        # client.set_pasv(False)
-        # client.retrlines('RETR main.txt')
+        client.set_pasv(False)
+        client.retrlines('RETR main.txt')
+        with io.BytesIO(bytes(b'hello world')) as fp:
+            client.storlines("STOR main.txt", fp)
