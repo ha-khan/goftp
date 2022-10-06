@@ -53,6 +53,8 @@ func (w Worker) handlePWD(req *Request) (Response, error) {
 }
 
 func (w Worker) handleQuit(req *Request) (Response, error) {
+	// FIXME: need to figure out a better way to close this
+	w.shutdown()
 	return UserQuit, nil
 }
 
@@ -101,15 +103,81 @@ REPRESENTATION TYPE (TYPE)
 	    default.
 */
 func (w *Worker) handleType(req *Request) (Response, error) {
+	if len(req.Arg) != 1 {
+		return SyntaxError2, nil
+	}
+
+	symbol := rune(req.Arg[0])
+	if symbol != 'A' && symbol != 'I' {
+		return CmdNotImplementedForParam, nil
+	}
+
+	w.ty = symbol
 	return CommandOK, nil
 }
 
+/*
+TRANSFER MODE (MODE)
+
+	The argument is a single Telnet character code specifying
+	the data transfer modes described in the Section on
+	Transmission Modes.
+
+	The following codes are assigned for transfer modes:
+
+	   S - Stream
+	   B - Block
+	   C - Compressed
+
+	The default transfer mode is Stream.
+*/
 func (w *Worker) handleMode(req *Request) (Response, error) {
-	return "", nil
+	if len(req.Arg) != 1 {
+		return SyntaxError2, nil
+	}
+
+	symbol := rune(req.Arg[0])
+	if symbol != 'S' {
+		return CmdNotImplementedForParam, nil
+	}
+
+	w.mo = symbol
+
+	return CommandOK, nil
 }
 
+/*
+FILE STRUCTURE (STRU)
+
+	The argument is a single Telnet character code specifying
+	file structure described in the Section on Data
+	Representation and Storage.
+
+	The following codes are assigned for structure:
+
+	   F - File (no record structure)
+	   R - Record structure
+	   P - Page structure
+
+	The default structure is File.
+*/
 func (w *Worker) handleStrucure(req *Request) (Response, error) {
-	return "", nil
+	if len(req.Arg) != 1 {
+		return SyntaxError2, nil
+	}
+
+	symbol := rune(req.Arg[0])
+	if symbol != 'F' && symbol != 'R' {
+		return CmdNotImplementedForParam, nil
+	}
+
+	if symbol == 'R' && w.ty != 'A' {
+		return CmdNotImplementedForParam, nil
+	}
+
+	w.stru = symbol
+
+	return CommandOK, nil
 }
 
 /*
@@ -125,6 +193,8 @@ PASSIVE (PASV)
 	This address information is broken into 8-bit fields and the
 	value of each field is transmitted as a decimal number (in
 	character string representation).
+
+	FIXME: Need to make this resilient against weird cmd sequences
 */
 func (w *Worker) handlePassive(req *Request) (Response, error) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -178,6 +248,8 @@ DATA PORT (PORT)
 
 	where h1 is the high order 8 bits of the internet host
 	address.
+
+	FIXME: need to make this resilient against weird cmd sequences
 */
 func (w *Worker) handlePort(req *Request) (Response, error) {
 	ctx, cancel := context.WithCancel(context.Background())
