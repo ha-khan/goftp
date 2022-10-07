@@ -111,6 +111,8 @@ func (w *Worker) Start(conn net.Conn) {
 			w.logger.Infof(fmt.Sprintf("Parsing Error: %v", err))
 		}
 
+		// FIXME: We should consider errors thrown by handler as either
+		// recoverable or unrecoverable
 		resp, err := handler(req)
 		if err != nil {
 			w.logger.Infof(fmt.Sprintf("Handler Error: %v", err))

@@ -19,7 +19,8 @@ func (w Worker) checkIfLoggedIn(fn Handler) Handler {
 			return fn(req)
 		}
 
-		return NotLoggedIn, fmt.Errorf("client not authenticated to run CMD")
+		w.logger.Infof(fmt.Sprintf("client not authenticated to run CMD"))
+		return NotLoggedIn, nil
 	}
 }
 
@@ -29,7 +30,8 @@ func (w *Worker) handleUserLogin(req *Request) (Response, error) {
 	}
 
 	if _, ok := w.users[req.Arg]; !ok {
-		return NotLoggedIn, fmt.Errorf("username: %s, not recognized", req.Arg)
+		w.logger.Infof(fmt.Sprintf("username: %s, not recognized", req.Arg))
+		return NotLoggedIn, nil
 	}
 
 	// set current user for this worker
@@ -45,10 +47,13 @@ func (w *Worker) handleUserPassword(req *Request) (Response, error) {
 		}
 	}
 
-	return NotLoggedIn, fmt.Errorf("incorrect password received for username %s", w.currentUser)
+	w.logger.Infof(fmt.Sprintf("incorrect password received for username %s", w.currentUser))
+	return NotLoggedIn, nil
 }
 
-func (w Worker) handlePWD(req *Request) (Response, error) {
+func (w *Worker) handleReinitialize(req *Request) (Response, error) {
+	w.currentUser = ""
+	w.loggedIn = false
 	return Response(fmt.Sprintf(string(DirectoryResponse), w.pwd)), nil
 }
 
@@ -56,6 +61,10 @@ func (w Worker) handleQuit(req *Request) (Response, error) {
 	// FIXME: need to figure out a better way to close this
 	w.shutdown()
 	return UserQuit, nil
+}
+
+func (w Worker) handlePWD(req *Request) (Response, error) {
+	return Response(fmt.Sprintf(string(DirectoryResponse), w.pwd)), nil
 }
 
 func (w Worker) handleNoop(req *Request) (Response, error) {
@@ -298,13 +307,17 @@ func (w *Worker) handlePort(req *Request) (Response, error) {
 	return CommandOK, nil
 }
 
-/*
-will attempt to open file at PWD/req.Arg
-
-TODO: Need to take into account the TYPE command
-
-	if TYPE A, we can use a generic scanner, else
-*/
+// RETR
+//
+//	125, 150
+//	   (110)
+//	   226, 250
+//	   425, 426, 451
+//	450, 550
+//	500, 501, 421, 530
+//
+// TODO: Need to take into account the TYPE command
+// if TYPE A, we can use a generic scanner, else
 func (w *Worker) handleRetrieve(req *Request) (Response, error) {
 	go func() {
 		defer w.shutdown()
@@ -332,6 +345,14 @@ func (w *Worker) handleRetrieve(req *Request) (Response, error) {
 	return StartTransfer, nil
 }
 
+// STOR
+//
+//	125, 150
+//	   (110)
+//	   226, 250
+//	   425, 426, 451, 551, 552
+//	532, 450, 452, 553
+//	500, 501, 421, 530
 func (w *Worker) handleStore(req *Request) (Response, error) {
 	go func() {
 		defer w.shutdown()
@@ -342,4 +363,13 @@ func (w *Worker) handleStore(req *Request) (Response, error) {
 	}()
 
 	return StartTransfer, nil
+}
+
+// DELE
+//
+//	250
+//	450, 550
+//	500, 501, 502, 421, 530
+func (w *Worker) handleDelete(req *Request) (Response, error) {
+	return TransferComplete, nil
 }

@@ -63,7 +63,7 @@ func (w *Worker) Parse(request string) (Handler, *Request, error) {
 		"ABOR", "RMD", "MKD", "NLST", "SITE", "SYST", "STAT":
 		handler = w.handleCmdNotImplemented
 	default:
-		return w.handleSyntaxErrorInvalidCmd, req, fmt.Errorf("Invaled CMD: %s", req.Cmd)
+		return w.handleSyntaxErrorInvalidCmd, req, fmt.Errorf("Invalid CMD: %s", req.Cmd)
 	}
 
 	return w.checkIfLoggedIn(handler), req, nil
