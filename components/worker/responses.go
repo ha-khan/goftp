@@ -35,6 +35,7 @@ const (
 // 400s
 const (
 	CannotOpenDataConnection Response = "425 Can't open data connection"
+	FileActionNotTaken                = "450 Requested file action not taken"
 )
 
 // 500s

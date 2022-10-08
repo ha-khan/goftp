@@ -210,6 +210,7 @@ func (w *Worker) handlePassive(req *Request) (Response, error) {
 	w.shutdown = cancel
 	ready := make(chan error)
 	go func() {
+		w.currentCMD = Pasv
 		server, err := net.Listen("tcp", ":2024")
 		ready <- err
 		if err != nil {
@@ -265,6 +266,7 @@ func (w *Worker) handlePort(req *Request) (Response, error) {
 	w.shutdown = cancel
 	ready := make(chan error)
 	go func() {
+		w.currentCMD = Port
 		strs := strings.Split(req.Arg, ",")
 
 		MSB, err := strconv.Atoi(strs[4])
@@ -320,6 +322,7 @@ func (w *Worker) handlePort(req *Request) (Response, error) {
 // if TYPE A, we can use a generic scanner, else
 func (w *Worker) handleRetrieve(req *Request) (Response, error) {
 	go func() {
+		w.currentCMD = Retrieve
 		defer w.shutdown()
 
 		fd, err := os.Open("./" + w.pwd + "/" + req.Arg)
@@ -355,6 +358,7 @@ func (w *Worker) handleRetrieve(req *Request) (Response, error) {
 //	500, 501, 421, 530
 func (w *Worker) handleStore(req *Request) (Response, error) {
 	go func() {
+		w.currentCMD = Store
 		defer w.shutdown()
 		conn := <-w.connection
 		bytes, _ := io.ReadAll(conn.socket)

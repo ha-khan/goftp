@@ -10,6 +10,15 @@ import (
 // worker handles the entire lifecycle management of each control connection
 // initiated against the ftp server
 //
+// ftp is stateful protocol, which means that a given request is handled
+// based off of the previous requests that were handled
+//
+// # Thus a worker will be modeled after a finite-state machine
+//
+// those previous requests set specific state information
+// (loggedIn, pwd, mo, stru, ty, currentOp), this tuple will be used to accept/reject a
+// given Request, but checking a TransitionTable
+//
 // in RFC 959 terms, this worker would be known as the Server-PI,
 // ftp is a request/response protocol and each read (request) will have its write (response)
 // execution of the handler is done
@@ -59,6 +68,7 @@ type Worker struct {
 	// signals whether STOR/RETR finished successfully or not
 	// either passive
 	transferComplete chan error
+	currentCMD       CMD
 }
 
 func New(l logger.Client) *Worker {
@@ -74,6 +84,7 @@ func New(l logger.Client) *Worker {
 		}),
 		shutdown:         func() {},
 		transferComplete: make(chan error),
+		currentCMD:       "NONE",
 		mo:               'S', // Stream
 		stru:             'F', // File
 		ty:               'A', // ASCII
@@ -108,7 +119,18 @@ func (w *Worker) Start(conn net.Conn) {
 
 		handler, req, err := w.Parse(string(buffer))
 		if err != nil {
+			// TODO: we only throw an error if we can't parse, which means we should
+			// run the handler and return the response to the user
+			//
+			// since we failed to parse the received command, we can avoid doing
+			// the transitionFunction Check
 			w.logger.Infof(fmt.Sprintf("Parsing Error: %v", err))
+		}
+
+		if reject := w.RejectCMD(req); reject {
+			handler = func(r *Request) (Response, error) {
+				return FileActionNotTaken, nil
+			}
 		}
 
 		// FIXME: We should consider errors thrown by handler as either
@@ -118,6 +140,7 @@ func (w *Worker) Start(conn net.Conn) {
 			w.logger.Infof(fmt.Sprintf("Handler Error: %v", err))
 		}
 
+		// TODO: should invoke a go routine for the writeback
 		switch conn.Write(resp.Byte()); resp {
 		case UserQuit:
 			return
@@ -128,7 +151,16 @@ func (w *Worker) Start(conn net.Conn) {
 			} else {
 				conn.Write(TransferComplete.Byte())
 			}
+
+			w.currentCMD = None
 		default:
 		}
 	}
+}
+
+// TODO: implement this method to close any resources (channels, connections, etc)
+// thus ending this Worker
+func (w *Worker) Stop() {
+	// gracefully shutdown worker
+	// reject all subsequent commands
 }
