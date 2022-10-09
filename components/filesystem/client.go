@@ -1,5 +1,8 @@
 package filesystem
 
+import "io"
+
 type Client interface {
-	Write()
+	io.ReadWriter
+	List(string) string
 }

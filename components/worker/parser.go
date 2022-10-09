@@ -53,7 +53,7 @@ func (w *Worker) Parse(request string) (Handler, *Request, error) {
 	case "RETR":
 		handler = w.handleRetrieve
 	case "DELE":
-		return nil, nil, nil
+		handler = w.handleDelete
 	case "NOOP":
 		handler = w.handleNoop
 	case "QUIT":

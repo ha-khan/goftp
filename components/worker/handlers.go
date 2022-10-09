@@ -58,7 +58,6 @@ func (w *Worker) handleReinitialize(req *Request) (Response, error) {
 }
 
 func (w Worker) handleQuit(req *Request) (Response, error) {
-	// FIXME: need to figure out a better way to close this
 	w.shutdown()
 	return UserQuit, nil
 }
@@ -212,12 +211,25 @@ func (w *Worker) handlePassive(req *Request) (Response, error) {
 	go func() {
 		w.currentCMD = Pasv
 		server, err := net.Listen("tcp", ":2024")
-		ready <- err
-		if err != nil {
+		w.shutdown = func() {
+			cancel()
+			server.Close()
+		}
+
+		// exit go routine if error encountered opening server
+		if ready <- err; err != nil {
 			return
 		}
 
 		conn, err := server.Accept()
+		// need to check error and see if triggered
+		// by shutdown func
+		w.shutdown = func() {
+			cancel()
+			server.Close()
+			conn.Close()
+		}
+
 		w.connection <- struct {
 			socket net.Conn
 			err    error
@@ -228,11 +240,10 @@ func (w *Worker) handlePassive(req *Request) (Response, error) {
 
 		<-ctx.Done()
 		w.logger.Infof("Closing Data Connection")
-		conn.Close()
-		server.Close()
 	}()
 
 	if err := <-ready; err != nil {
+		w.shutdown()
 		return CannotOpenDataConnection, err
 	}
 
@@ -280,16 +291,20 @@ func (w *Worker) handlePort(req *Request) (Response, error) {
 			ready <- err
 			return
 		}
-		port := uint16(MSB)<<8 + uint16(LSB)
 
+		port := uint16(MSB)<<8 + uint16(LSB)
 		conn, err := net.Dial("tcp", strings.Join(strs[:4], ".")+":"+fmt.Sprintf("%d", port))
+		w.shutdown = func() {
+			cancel()
+			conn.Close()
+		}
+
 		if err != nil {
 			ready <- err
 			return
 		}
 
 		ready <- nil
-		defer conn.Close()
 		w.connection <- struct {
 			socket net.Conn
 			err    error
@@ -320,6 +335,9 @@ func (w *Worker) handlePort(req *Request) (Response, error) {
 //
 // TODO: Need to take into account the TYPE command
 // if TYPE A, we can use a generic scanner, else
+//
+// TODO: need to coordinate, after sending StartTransfer response
+// back against the control connection, we then start the retrieve
 func (w *Worker) handleRetrieve(req *Request) (Response, error) {
 	go func() {
 		w.currentCMD = Retrieve
@@ -356,6 +374,9 @@ func (w *Worker) handleRetrieve(req *Request) (Response, error) {
 //	   425, 426, 451, 551, 552
 //	532, 450, 452, 553
 //	500, 501, 421, 530
+//
+// TODO: need to coordinate, after sending StartTransfer response
+// back against the control connection, we then start the store
 func (w *Worker) handleStore(req *Request) (Response, error) {
 	go func() {
 		w.currentCMD = Store
@@ -363,6 +384,7 @@ func (w *Worker) handleStore(req *Request) (Response, error) {
 		conn := <-w.connection
 		bytes, _ := io.ReadAll(conn.socket)
 		fmt.Print(string(bytes))
+
 		w.transferComplete <- nil
 	}()
 

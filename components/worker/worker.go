@@ -63,6 +63,9 @@ type Worker struct {
 		socket net.Conn
 		err    error
 	}
+	// shutdown will contain the cleanup function used to
+	// close any open dtp servers/connections and is meant
+	// to be called at the end of any finished transfer function
 	shutdown func()
 
 	// signals whether STOR/RETR finished successfully or not
