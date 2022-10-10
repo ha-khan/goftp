@@ -55,23 +55,8 @@ type Worker struct {
 	// I - Image (data is sent as contiguous bits, which  are packed into 8-bit transfer bytes)
 	ty rune
 
-	// allows communication of spawned data transfer port go routine
-	// this worker will feed bytes which will be sent
-	// through the channel, when done the shutdown (cancel) func
-	// will be invoked
-	connection chan struct {
-		socket net.Conn
-		err    error
-	}
-	// shutdown will contain the cleanup function used to
-	// close any open dtp servers/connections and is meant
-	// to be called at the end of any finished transfer function
-	shutdown func()
-
-	// signals whether STOR/RETR finished successfully or not
-	// either passive
-	transferComplete chan error
-	currentCMD       CMD
+	currentCMD CMD
+	dataWorker *DataWorker
 }
 
 func New(l logger.Client) *Worker {
@@ -80,17 +65,11 @@ func New(l logger.Client) *Worker {
 		users: map[string]string{
 			"hkhan": "password",
 		},
-		pwd: "/temp",
-		connection: make(chan struct {
-			socket net.Conn
-			err    error
-		}),
-		shutdown:         func() {},
-		transferComplete: make(chan error),
-		currentCMD:       "NONE",
-		mo:               'S', // Stream
-		stru:             'F', // File
-		ty:               'A', // ASCII
+		pwd:        "/temp",
+		currentCMD: "NONE",
+		mo:         'S', // Stream
+		stru:       'F', // File
+		ty:         'A', // ASCII
 	}
 }
 
@@ -100,10 +79,6 @@ func New(l logger.Client) *Worker {
 // much of the core logic that drives the control connection is
 // handled here such as errors, responses, and more complex workflows
 // such as the actual transfer of bytes across the data connection
-//
-// errors are rarely
-//
-// TODO: break this into two streams, receiver cmds, and responding
 func (w *Worker) Start(conn net.Conn) {
 	defer func() {
 		w.logger.Infof("Closing Control Connection")
@@ -122,11 +97,6 @@ func (w *Worker) Start(conn net.Conn) {
 
 		handler, req, err := w.Parse(string(buffer))
 		if err != nil {
-			// TODO: we only throw an error if we can't parse, which means we should
-			// run the handler and return the response to the user
-			//
-			// since we failed to parse the received command, we can avoid doing
-			// the transitionFunction Check
 			w.logger.Infof(fmt.Sprintf("Parsing Error: %v", err))
 		}
 
@@ -136,27 +106,29 @@ func (w *Worker) Start(conn net.Conn) {
 			}
 		}
 
-		// FIXME: We should consider errors thrown by handler as either
-		// recoverable or unrecoverable
 		resp, err := handler(req)
 		if err != nil {
 			w.logger.Infof(fmt.Sprintf("Handler Error: %v", err))
 		}
 
-		// TODO: should invoke a go routine for the writeback
-		switch conn.Write(resp.Byte()); resp {
+		switch resp {
 		case UserQuit:
+			conn.Write(resp.Byte())
+			// TODO: need to ensure that data connection is also cleaned up
+			// w.dataWorker.Disconnect()
 			return
 		case StartTransfer:
-			if err = <-w.transferComplete; err != nil {
-				w.logger.Infof(fmt.Sprintf("Transfer Error: %v", err))
-				// TODO: write back that transfer failed
-			} else {
-				conn.Write(TransferComplete.Byte())
-			}
+			conn.Write(resp.Byte())
+			w.dataWorker.StartTransfer(func(err error, resp Response) {
+				if err != nil {
+					w.logger.Infof(fmt.Sprintf("Transfer Error: %v", err))
+				}
 
-			w.currentCMD = None
+				conn.Write(resp.Byte())
+				w.currentCMD = None
+			})
 		default:
+			conn.Write(resp.Byte())
 		}
 	}
 }
@@ -166,4 +138,7 @@ func (w *Worker) Start(conn net.Conn) {
 func (w *Worker) Stop() {
 	// gracefully shutdown worker
 	// reject all subsequent commands
+	if w.dataWorker != nil {
+		w.dataWorker.Disconnect()
+	}
 }

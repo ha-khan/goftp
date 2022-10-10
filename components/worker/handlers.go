@@ -1,14 +1,7 @@
 package worker
 
 import (
-	"bufio"
-	"context"
 	"fmt"
-	"io"
-	"net"
-	"os"
-	"strconv"
-	"strings"
 )
 
 type Handler func(*Request) (Response, error)
@@ -58,7 +51,6 @@ func (w *Worker) handleReinitialize(req *Request) (Response, error) {
 }
 
 func (w Worker) handleQuit(req *Request) (Response, error) {
-	w.shutdown()
 	return UserQuit, nil
 }
 
@@ -188,68 +180,16 @@ func (w *Worker) handleStrucure(req *Request) (Response, error) {
 	return CommandOK, nil
 }
 
-/*
-PASSIVE (PASV)
-
-	This command requests the server-DTP to "listen" on a data
-	port (which is not its default data port) and to wait for a
-	connection rather than initiate one upon receipt of a
-	transfer command.  The response to this command includes the
-	host and port address this server is listening on.
-
-	a 32-bit internet host address and a 16-bit TCP port address.
-	This address information is broken into 8-bit fields and the
-	value of each field is transmitted as a decimal number (in
-	character string representation).
-
-	FIXME: Need to make this resilient against weird cmd sequences
-*/
-func (w *Worker) handlePassive(req *Request) (Response, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	w.shutdown = cancel
-	ready := make(chan error)
-	go func() {
-		w.currentCMD = Pasv
-		server, err := net.Listen("tcp", ":2024")
-		w.shutdown = func() {
-			cancel()
-			server.Close()
-		}
-
-		// exit go routine if error encountered opening server
-		if ready <- err; err != nil {
-			return
-		}
-
-		conn, err := server.Accept()
-		// need to check error and see if triggered
-		// by shutdown func
-		w.shutdown = func() {
-			cancel()
-			server.Close()
-			conn.Close()
-		}
-
-		w.connection <- struct {
-			socket net.Conn
-			err    error
-		}{
-			conn,
-			err,
-		}
-
-		<-ctx.Done()
-		w.logger.Infof("Closing Data Connection")
-	}()
-
-	if err := <-ready; err != nil {
-		w.shutdown()
-		return CannotOpenDataConnection, err
-	}
-
-	return PassiveMode, nil
+// DELE
+//
+//	250
+//	450, 550
+//	500, 501, 502, 421, 530
+func (w *Worker) handleDelete(req *Request) (Response, error) {
+	return TransferComplete, nil
 }
 
+//---------------------------------------------------------------------------
 /*
 DATA PORT (PORT)
 
@@ -273,55 +213,35 @@ DATA PORT (PORT)
 	FIXME: need to make this resilient against weird cmd sequences
 */
 func (w *Worker) handlePort(req *Request) (Response, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	w.shutdown = cancel
-	ready := make(chan error)
-	go func() {
-		w.currentCMD = Port
-		strs := strings.Split(req.Arg, ",")
+	dw := NewDataWorker(req, false, w.pwd)
+	w.dataWorker = dw
+	w.currentCMD = Port
 
-		MSB, err := strconv.Atoi(strs[4])
-		if err != nil {
-			ready <- err
-			return
-		}
+	return dw.Connect(req), nil
+}
 
-		LSB, err := strconv.Atoi(strs[5])
-		if err != nil {
-			ready <- err
-			return
-		}
+/*
+PASSIVE (PASV)
 
-		port := uint16(MSB)<<8 + uint16(LSB)
-		conn, err := net.Dial("tcp", strings.Join(strs[:4], ".")+":"+fmt.Sprintf("%d", port))
-		w.shutdown = func() {
-			cancel()
-			conn.Close()
-		}
+	This command requests the server-DTP to "listen" on a data
+	port (which is not its default data port) and to wait for a
+	connection rather than initiate one upon receipt of a
+	transfer command.  The response to this command includes the
+	host and port address this server is listening on.
 
-		if err != nil {
-			ready <- err
-			return
-		}
+	a 32-bit internet host address and a 16-bit TCP port address.
+	This address information is broken into 8-bit fields and the
+	value of each field is transmitted as a decimal number (in
+	character string representation).
 
-		ready <- nil
-		w.connection <- struct {
-			socket net.Conn
-			err    error
-		}{
-			conn,
-			err,
-		}
+	FIXME: Need to make this resilient against weird cmd sequences
+*/
+func (w *Worker) handlePassive(req *Request) (Response, error) {
+	dw := NewDataWorker(req, true, w.pwd)
+	w.dataWorker = dw
+	w.currentCMD = Pasv
 
-		<-ctx.Done()
-		w.logger.Infof("Closing Data Connection")
-	}()
-
-	if err := <-ready; err != nil {
-		return CannotOpenDataConnection, err
-	}
-
-	return CommandOK, nil
+	return dw.Connect(req), nil
 }
 
 // RETR
@@ -339,30 +259,9 @@ func (w *Worker) handlePort(req *Request) (Response, error) {
 // TODO: need to coordinate, after sending StartTransfer response
 // back against the control connection, we then start the retrieve
 func (w *Worker) handleRetrieve(req *Request) (Response, error) {
-	go func() {
-		w.currentCMD = Retrieve
-		defer w.shutdown()
-
-		fd, err := os.Open("./" + w.pwd + "/" + req.Arg)
-		if err != nil {
-			w.transferComplete <- err
-			return
-		}
-
-		conn := <-w.connection
-		if conn.err != nil {
-			w.transferComplete <- conn.err
-			return
-		}
-
-		scanner := bufio.NewScanner(fd)
-		for scanner.Scan() {
-			conn.socket.Write(append(scanner.Bytes(), []byte("\n")...))
-		}
-
-		w.transferComplete <- nil
-	}()
-
+	w.currentCMD = Retrieve
+	w.dataWorker.SetTransferType("RETR")
+	w.dataWorker.SetTransferRequest(req)
 	return StartTransfer, nil
 }
 
@@ -378,24 +277,8 @@ func (w *Worker) handleRetrieve(req *Request) (Response, error) {
 // TODO: need to coordinate, after sending StartTransfer response
 // back against the control connection, we then start the store
 func (w *Worker) handleStore(req *Request) (Response, error) {
-	go func() {
-		w.currentCMD = Store
-		defer w.shutdown()
-		conn := <-w.connection
-		bytes, _ := io.ReadAll(conn.socket)
-		fmt.Print(string(bytes))
-
-		w.transferComplete <- nil
-	}()
-
+	w.currentCMD = Store
+	w.dataWorker.SetTransferType("STOR")
+	w.dataWorker.SetTransferRequest(req)
 	return StartTransfer, nil
-}
-
-// DELE
-//
-//	250
-//	450, 550
-//	500, 501, 502, 421, 530
-func (w *Worker) handleDelete(req *Request) (Response, error) {
-	return TransferComplete, nil
 }
