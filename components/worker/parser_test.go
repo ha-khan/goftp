@@ -7,7 +7,7 @@ import (
 )
 
 func Test_Parse_Format_Error(t *testing.T) {
-	w := New(logger.NewStdStreamClient())
+	w := NewControlWorker(logger.NewStdStreamClient())
 
 	handler, req, err := w.Parse("abcd efg nhijk lmnop\r\n")
 	if err == nil {
@@ -25,7 +25,7 @@ func Test_Parse_Format_Error(t *testing.T) {
 }
 
 func Test_Parse_CMD_Not_Implemented(t *testing.T) {
-	w := New(logger.NewStdStreamClient())
+	w := NewControlWorker(logger.NewStdStreamClient())
 	w.loggedIn = true
 
 	// if the cmd is recognized by RFC 959, but we're not implementing it,
@@ -47,7 +47,7 @@ func Test_Parse_CMD_Not_Implemented(t *testing.T) {
 }
 
 func Test_Parse_Invalid_Cmd(t *testing.T) {
-	w := New(logger.NewStdStreamClient())
+	w := NewControlWorker(logger.NewStdStreamClient())
 
 	handler, req, err := w.Parse("EPSV\r\n")
 	if err == nil {

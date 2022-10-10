@@ -3,6 +3,7 @@ package worker
 import (
 	"bufio"
 	"fmt"
+	"goftp/components/logger"
 	"io"
 	"net"
 	"os"
@@ -13,7 +14,6 @@ import (
 type callback func(error, Response)
 
 type DataWorker struct {
-	// embedded
 	server net.Listener
 	conn   net.Conn
 
@@ -22,6 +22,8 @@ type DataWorker struct {
 		socket net.Conn
 		err    error
 	}
+
+	logger logger.Client
 
 	host string
 	port uint16
@@ -32,14 +34,14 @@ type DataWorker struct {
 	transferType string
 }
 
-func NewDataWorker(req *Request, pasv bool, pwd string) *DataWorker {
+func NewDataWorker(pwd string, logger logger.Client) *DataWorker {
 	return &DataWorker{
-		pasv: pasv,
 		connection: make(chan struct {
 			socket net.Conn
 			err    error
 		}),
-		pwd: pwd,
+		pwd:    pwd,
+		logger: logger,
 	}
 }
 
@@ -172,20 +174,12 @@ func (d *DataWorker) Connect(req *Request) Response {
 	return response
 }
 
-func (d *DataWorker) SetTransferType(t string) error {
-	if t != "RETR" && t != "STOR" {
-		return fmt.Errorf("Invalid transfer type")
-	}
-
-	d.transferType = t
-	return nil
-}
-
 func (d *DataWorker) SetTransferRequest(req *Request) {
+	d.transferType = req.Cmd
 	d.transferReq = req
 }
 
-func (d *DataWorker) StartTransfer(cb callback) {
+func (d *DataWorker) Start(cb callback) {
 	if d.transferType == "RETR" {
 		d.retrieve(cb)
 	} else if d.transferType == "STOR" {
@@ -195,7 +189,6 @@ func (d *DataWorker) StartTransfer(cb callback) {
 
 // clean up conn
 func (d *DataWorker) Disconnect() {
-
 	if d.server != nil {
 		d.server.Close()
 	}
@@ -203,8 +196,12 @@ func (d *DataWorker) Disconnect() {
 	if d.conn != nil {
 		d.conn.Close()
 	}
+}
 
-	// TODO: need to figure out how to close this
-	// if quit was received right after PASV or PORT
+// disconnect any open connections and
+// close any open channels
+// DataWorker is considered halted for use
+func (d *DataWorker) Stop() {
+	d.Disconnect()
 	close(d.connection)
 }

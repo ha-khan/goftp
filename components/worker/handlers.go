@@ -6,71 +6,71 @@ import (
 
 type Handler func(*Request) (Response, error)
 
-func (w Worker) checkIfLoggedIn(fn Handler) Handler {
+func (c ControlWorker) checkIfLoggedIn(fn Handler) Handler {
 	return func(req *Request) (Response, error) {
-		if w.loggedIn {
+		if c.loggedIn {
 			return fn(req)
 		}
 
-		w.logger.Infof(fmt.Sprintf("client not authenticated to run CMD"))
+		c.logger.Infof(fmt.Sprintf("client not authenticated to run CMD"))
 		return NotLoggedIn, nil
 	}
 }
 
-func (w *Worker) handleUserLogin(req *Request) (Response, error) {
-	if w.loggedIn {
+func (c *ControlWorker) handleUserLogin(req *Request) (Response, error) {
+	if c.loggedIn {
 		return UserLoggedIn, nil
 	}
 
-	if _, ok := w.users[req.Arg]; !ok {
-		w.logger.Infof(fmt.Sprintf("username: %s, not recognized", req.Arg))
+	if _, ok := c.users[req.Arg]; !ok {
+		c.logger.Infof(fmt.Sprintf("username: %s, not recognized", req.Arg))
 		return NotLoggedIn, nil
 	}
 
 	// set current user for this worker
-	w.currentUser = req.Arg
+	c.currentUser = req.Arg
 	return UserOkNeedPW, nil
 }
 
-func (w *Worker) handleUserPassword(req *Request) (Response, error) {
-	if pw, ok := w.users[w.currentUser]; ok {
+func (c *ControlWorker) handleUserPassword(req *Request) (Response, error) {
+	if pw, ok := c.users[c.currentUser]; ok {
 		if pw == req.Arg {
-			w.loggedIn = true
+			c.loggedIn = true
 			return UserLoggedIn, nil
 		}
 	}
 
-	w.logger.Infof(fmt.Sprintf("incorrect password received for username %s", w.currentUser))
+	c.logger.Infof(fmt.Sprintf("incorrect password received for username %s", c.currentUser))
 	return NotLoggedIn, nil
 }
 
-func (w *Worker) handleReinitialize(req *Request) (Response, error) {
-	w.currentUser = ""
-	w.loggedIn = false
-	return Response(fmt.Sprintf(string(DirectoryResponse), w.pwd)), nil
+func (c *ControlWorker) handleReinitialize(req *Request) (Response, error) {
+	c.currentUser = ""
+	c.loggedIn = false
+	return Response(fmt.Sprintf(string(DirectoryResponse), c.pwd)), nil
 }
 
-func (w Worker) handleQuit(req *Request) (Response, error) {
+func (c ControlWorker) handleQuit(req *Request) (Response, error) {
 	return UserQuit, nil
 }
 
-func (w Worker) handlePWD(req *Request) (Response, error) {
-	return Response(fmt.Sprintf(string(DirectoryResponse), w.pwd)), nil
+func (c ControlWorker) handlePWD(req *Request) (Response, error) {
+	return Response(fmt.Sprintf(string(DirectoryResponse), c.pwd)), nil
 }
 
-func (w Worker) handleNoop(req *Request) (Response, error) {
+func (c ControlWorker) handleNoop(req *Request) (Response, error) {
 	return CommandOK, nil
 }
 
-func (w Worker) handleSyntaxErrorParams(req *Request) (Response, error) {
+func (c ControlWorker) handleSyntaxErrorParams(req *Request) (Response, error) {
 	return SyntaxError2, nil
 }
 
-func (w Worker) handleSyntaxErrorInvalidCmd(req *Request) (Response, error) {
+func (c ControlWorker) handleSyntaxErrorInvalidCmd(req *Request) (Response, error) {
 	return SyntaxError1, nil
 }
 
-func (w Worker) handleCmdNotImplemented(req *Request) (Response, error) {
+func (c ControlWorker) handleCmdNotImplemented(req *Request) (Response, error) {
 	return CmdNotImplemented, nil
 }
 
@@ -102,7 +102,7 @@ REPRESENTATION TYPE (TYPE)
 	    argument is changed, Format then returns to the Non-print
 	    default.
 */
-func (w *Worker) handleType(req *Request) (Response, error) {
+func (c *ControlWorker) handleType(req *Request) (Response, error) {
 	if len(req.Arg) != 1 {
 		return SyntaxError2, nil
 	}
@@ -112,7 +112,7 @@ func (w *Worker) handleType(req *Request) (Response, error) {
 		return CmdNotImplementedForParam, nil
 	}
 
-	w.ty = symbol
+	c.ty = symbol
 	return CommandOK, nil
 }
 
@@ -131,7 +131,7 @@ TRANSFER MODE (MODE)
 
 	The default transfer mode is Stream.
 */
-func (w *Worker) handleMode(req *Request) (Response, error) {
+func (c *ControlWorker) handleMode(req *Request) (Response, error) {
 	if len(req.Arg) != 1 {
 		return SyntaxError2, nil
 	}
@@ -141,7 +141,7 @@ func (w *Worker) handleMode(req *Request) (Response, error) {
 		return CmdNotImplementedForParam, nil
 	}
 
-	w.mo = symbol
+	c.mo = symbol
 
 	return CommandOK, nil
 }
@@ -161,7 +161,7 @@ FILE STRUCTURE (STRU)
 
 	The default structure is File.
 */
-func (w *Worker) handleStrucure(req *Request) (Response, error) {
+func (c *ControlWorker) handleStrucure(req *Request) (Response, error) {
 	if len(req.Arg) != 1 {
 		return SyntaxError2, nil
 	}
@@ -171,11 +171,11 @@ func (w *Worker) handleStrucure(req *Request) (Response, error) {
 		return CmdNotImplementedForParam, nil
 	}
 
-	if symbol == 'R' && w.ty != 'A' {
+	if symbol == 'R' && c.ty != 'A' {
 		return CmdNotImplementedForParam, nil
 	}
 
-	w.stru = symbol
+	c.stru = symbol
 
 	return CommandOK, nil
 }
@@ -185,7 +185,7 @@ func (w *Worker) handleStrucure(req *Request) (Response, error) {
 //	250
 //	450, 550
 //	500, 501, 502, 421, 530
-func (w *Worker) handleDelete(req *Request) (Response, error) {
+func (c *ControlWorker) handleDelete(req *Request) (Response, error) {
 	return TransferComplete, nil
 }
 
@@ -212,12 +212,9 @@ DATA PORT (PORT)
 
 	FIXME: need to make this resilient against weird cmd sequences
 */
-func (w *Worker) handlePort(req *Request) (Response, error) {
-	dw := NewDataWorker(req, false, w.pwd)
-	w.dataWorker = dw
-	w.currentCMD = Port
-
-	return dw.Connect(req), nil
+func (c *ControlWorker) handlePort(req *Request) (Response, error) {
+	c.currentCMD = Port
+	return c.dataWorker.Connect(req), nil
 }
 
 /*
@@ -236,12 +233,9 @@ PASSIVE (PASV)
 
 	FIXME: Need to make this resilient against weird cmd sequences
 */
-func (w *Worker) handlePassive(req *Request) (Response, error) {
-	dw := NewDataWorker(req, true, w.pwd)
-	w.dataWorker = dw
-	w.currentCMD = Pasv
-
-	return dw.Connect(req), nil
+func (c *ControlWorker) handlePassive(req *Request) (Response, error) {
+	c.currentCMD = Pasv
+	return c.dataWorker.Connect(req), nil
 }
 
 // RETR
@@ -258,10 +252,10 @@ func (w *Worker) handlePassive(req *Request) (Response, error) {
 //
 // TODO: need to coordinate, after sending StartTransfer response
 // back against the control connection, we then start the retrieve
-func (w *Worker) handleRetrieve(req *Request) (Response, error) {
-	w.currentCMD = Retrieve
-	w.dataWorker.SetTransferType("RETR")
-	w.dataWorker.SetTransferRequest(req)
+func (c *ControlWorker) handleRetrieve(req *Request) (Response, error) {
+	c.currentCMD = Retrieve
+	c.dataWorker.SetTransferRequest(req)
+
 	return StartTransfer, nil
 }
 
@@ -276,9 +270,9 @@ func (w *Worker) handleRetrieve(req *Request) (Response, error) {
 //
 // TODO: need to coordinate, after sending StartTransfer response
 // back against the control connection, we then start the store
-func (w *Worker) handleStore(req *Request) (Response, error) {
+func (w *ControlWorker) handleStore(req *Request) (Response, error) {
 	w.currentCMD = Store
-	w.dataWorker.SetTransferType("STOR")
 	w.dataWorker.SetTransferRequest(req)
+
 	return StartTransfer, nil
 }

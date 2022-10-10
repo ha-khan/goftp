@@ -52,7 +52,7 @@ func (d *Dispatcher) Start() {
 			return
 		}
 
-		go worker.New(d.logger).Start(conn)
+		go worker.NewControlWorker(d.logger).Start(conn)
 	}
 }
 

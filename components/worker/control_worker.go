@@ -25,7 +25,7 @@ import (
 //
 // ftp connections are terminated at will by the client
 // need to keep track of session information, which is done by using a struct
-type Worker struct {
+type ControlWorker struct {
 	logger logger.Client
 
 	// keeps track of currently logged in users
@@ -55,12 +55,15 @@ type Worker struct {
 	// I - Image (data is sent as contiguous bits, which  are packed into 8-bit transfer bytes)
 	ty rune
 
+	// keeps track of currently executing command, if that command is considered
+	// complex ~ pasv/port/retr/...etc, and forces as specific sequence of allowable
+	// commands to be called if set to a value other than 'None'
 	currentCMD CMD
 	dataWorker *DataWorker
 }
 
-func New(l logger.Client) *Worker {
-	return &Worker{
+func NewControlWorker(l logger.Client) *ControlWorker {
+	return &ControlWorker{
 		logger: l,
 		users: map[string]string{
 			"hkhan": "password",
@@ -70,6 +73,7 @@ func New(l logger.Client) *Worker {
 		mo:         'S', // Stream
 		stru:       'F', // File
 		ty:         'A', // ASCII
+		dataWorker: NewDataWorker("/temp", l),
 	}
 }
 
@@ -79,9 +83,9 @@ func New(l logger.Client) *Worker {
 // much of the core logic that drives the control connection is
 // handled here such as errors, responses, and more complex workflows
 // such as the actual transfer of bytes across the data connection
-func (w *Worker) Start(conn net.Conn) {
+func (c *ControlWorker) Start(conn net.Conn) {
 	defer func() {
-		w.logger.Infof("Closing Control Connection")
+		c.logger.Infof("Closing Control Connection")
 		conn.Close()
 	}()
 
@@ -91,16 +95,16 @@ func (w *Worker) Start(conn net.Conn) {
 	for {
 		buffer, err := reader.ReadBytes('\n')
 		if err != nil {
-			w.logger.Infof(fmt.Sprintf("Connection Buffer Read Error: %v", err))
+			c.logger.Infof(fmt.Sprintf("Connection Buffer Read Error: %v", err))
 			return
 		}
 
-		handler, req, err := w.Parse(string(buffer))
+		handler, req, err := c.Parse(string(buffer))
 		if err != nil {
-			w.logger.Infof(fmt.Sprintf("Parsing Error: %v", err))
+			c.logger.Infof(fmt.Sprintf("Parsing Error: %v", err))
 		}
 
-		if reject := w.RejectCMD(req); reject {
+		if reject := c.RejectCMD(req); reject {
 			handler = func(r *Request) (Response, error) {
 				return FileActionNotTaken, nil
 			}
@@ -108,24 +112,24 @@ func (w *Worker) Start(conn net.Conn) {
 
 		resp, err := handler(req)
 		if err != nil {
-			w.logger.Infof(fmt.Sprintf("Handler Error: %v", err))
+			c.logger.Infof(fmt.Sprintf("Handler Error: %v", err))
 		}
 
+		// TODO: need to handle errors here for failed Pasv/Port
 		switch resp {
 		case UserQuit:
 			conn.Write(resp.Byte())
-			// TODO: need to ensure that data connection is also cleaned up
-			// w.dataWorker.Disconnect()
+			c.dataWorker.Stop()
 			return
 		case StartTransfer:
 			conn.Write(resp.Byte())
-			w.dataWorker.StartTransfer(func(err error, resp Response) {
+			c.dataWorker.Start(func(err error, resp Response) {
 				if err != nil {
-					w.logger.Infof(fmt.Sprintf("Transfer Error: %v", err))
+					c.logger.Infof(fmt.Sprintf("Transfer Error: %v", err))
 				}
 
 				conn.Write(resp.Byte())
-				w.currentCMD = None
+				c.currentCMD = None
 			})
 		default:
 			conn.Write(resp.Byte())
@@ -135,10 +139,10 @@ func (w *Worker) Start(conn net.Conn) {
 
 // TODO: implement this method to close any resources (channels, connections, etc)
 // thus ending this Worker
-func (w *Worker) Stop() {
+func (c *ControlWorker) Stop() {
 	// gracefully shutdown worker
 	// reject all subsequent commands
-	if w.dataWorker != nil {
-		w.dataWorker.Disconnect()
+	if c.dataWorker != nil {
+		c.dataWorker.Disconnect()
 	}
 }

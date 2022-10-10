@@ -10,7 +10,7 @@ import (
 var accessControlTestCases = []struct {
 	TestName         string
 	Command          string
-	MutationFunc     func(w *Worker)
+	MutationFunc     func(w *ControlWorker)
 	HandlerErrCheck  func(e error, t *testing.T)
 	HandlerRespValue Response
 }{
@@ -38,7 +38,7 @@ var accessControlTestCases = []struct {
 	{
 		TestName: "Test_User_Password_Incorrect",
 		Command:  "PASS password123\r\n",
-		MutationFunc: func(w *Worker) {
+		MutationFunc: func(w *ControlWorker) {
 			w.currentUser = "hkhan"
 		},
 		HandlerErrCheck:  expectNilErr,
@@ -52,9 +52,9 @@ func expectNilErr(e error, t *testing.T) {
 	}
 }
 
-func noMutation(w *Worker) { return }
+func noMutation(w *ControlWorker) { return }
 
-func setUserLoggedIn(w *Worker) {
+func setUserLoggedIn(w *ControlWorker) {
 	w.loggedIn = true
 	return
 }
@@ -62,7 +62,7 @@ func setUserLoggedIn(w *Worker) {
 func TestDriver(t *testing.T) {
 	for _, testcase := range accessControlTestCases {
 		t.Run(testcase.TestName, func(t *testing.T) {
-			w := New(logger.NewStdStreamClient())
+			w := NewControlWorker(logger.NewStdStreamClient())
 			testcase.MutationFunc(w)
 			handler, req, err := w.Parse(testcase.Command)
 			if err != nil {

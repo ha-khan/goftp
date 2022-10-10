@@ -23,7 +23,10 @@ var baseReject = map[CMD]any{
 
 // currentCMD -> requestedCMD --> Reject ~ true | false
 var table = map[CMD]map[CMD]any{
-	None:     {},
+	None: {
+		Retrieve: nil,
+		Store:    nil,
+	},
 	Store:    baseReject,
 	Retrieve: baseReject,
 	Delete:   baseReject,
@@ -45,8 +48,8 @@ var table = map[CMD]map[CMD]any{
 // eventually return the worker to an "idle" state.
 //
 // configuration and other lcm commands are however still accepted,
-func (w *Worker) RejectCMD(requested *Request) bool {
-	_, reject := table[w.currentCMD][CMD(requested.Cmd)]
+func (c *ControlWorker) RejectCMD(requested *Request) bool {
+	_, reject := table[c.currentCMD][CMD(requested.Cmd)]
 
 	return reject
 }
