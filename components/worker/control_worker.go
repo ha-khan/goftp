@@ -7,11 +7,11 @@ import (
 	"net"
 )
 
-// worker handles the entire lifecycle management of each control connection
+// ControlWorker handles the entire lifecycle management of each control connection
 // initiated against the ftp server
 //
 // ftp is stateful protocol, which means that a given request is handled
-// based off of the previous requests that were handled
+// based off of how the previous requests were handled
 //
 // # Thus a worker will be modeled after a finite-state machine
 //
@@ -59,7 +59,9 @@ type ControlWorker struct {
 	// complex ~ pasv/port/retr/...etc, and forces as specific sequence of allowable
 	// commands to be called if set to a value other than 'None'
 	currentCMD CMD
-	dataWorker *DataWorker
+
+	// there is a 1-to-1 relation between ControlWorkers and DataWorkers
+	IDataWorker
 }
 
 func NewControlWorker(l logger.Client) *ControlWorker {
@@ -68,12 +70,12 @@ func NewControlWorker(l logger.Client) *ControlWorker {
 		users: map[string]string{
 			"hkhan": "password",
 		},
-		pwd:        "/temp",
-		currentCMD: "NONE",
-		mo:         'S', // Stream
-		stru:       'F', // File
-		ty:         'A', // ASCII
-		dataWorker: NewDataWorker("/temp", l),
+		pwd:         "/temp",
+		currentCMD:  "NONE",
+		mo:          'S', // Stream
+		stru:        'F', // File
+		ty:          'A', // ASCII
+		IDataWorker: NewDataWorker("/temp", l),
 	}
 }
 
@@ -119,15 +121,16 @@ func (c *ControlWorker) Start(conn net.Conn) {
 		switch resp {
 		case UserQuit:
 			conn.Write(resp.Byte())
-			c.dataWorker.Stop()
+			c.IDataWorker.Stop()
 			return
 		case StartTransfer:
 			conn.Write(resp.Byte())
-			c.dataWorker.Start(func(err error, resp Response) {
+			c.IDataWorker.Start(func(err error, resp Response) {
 				if err != nil {
 					c.logger.Infof(fmt.Sprintf("Transfer Error: %v", err))
 				}
 
+				// conn is considered thread safe
 				conn.Write(resp.Byte())
 				c.currentCMD = None
 			})
@@ -142,7 +145,5 @@ func (c *ControlWorker) Start(conn net.Conn) {
 func (c *ControlWorker) Stop() {
 	// gracefully shutdown worker
 	// reject all subsequent commands
-	if c.dataWorker != nil {
-		c.dataWorker.Disconnect()
-	}
+	c.IDataWorker.Stop()
 }

@@ -11,7 +11,14 @@ import (
 	"strings"
 )
 
-type callback func(error, Response)
+type Callback func(error, Response)
+
+type IDataWorker interface {
+	Start(Callback)
+	Stop()
+	SetTransferRequest(*Request)
+	Connect(*Request) Response
+}
 
 type DataWorker struct {
 	server net.Listener
@@ -45,9 +52,54 @@ func NewDataWorker(pwd string, logger logger.Client) *DataWorker {
 	}
 }
 
-func (d *DataWorker) retrieve(cb callback) {
+func (d *DataWorker) SetTransferRequest(req *Request) {
+	d.transferType = req.Cmd
+	d.transferReq = req
+}
+
+func (d *DataWorker) Start(cb Callback) {
+	if d.transferType == "RETR" {
+		d.retrieve(cb)
+	} else if d.transferType == "STOR" {
+		d.store(cb)
+	}
+}
+
+// disconnect any open connections and
+// close any open channels
+// DataWorker is considered halted for use
+func (d *DataWorker) Stop() {
+	d.disconnect()
+	close(d.connection)
+}
+
+func (d *DataWorker) Connect(req *Request) Response {
+	var response Response
+	if req.Cmd == "PASV" {
+		d.pasv = true
+		response = d.createPasv()
+	} else {
+		d.pasv = false
+		response = d.createPort(req)
+	}
+
+	return response
+}
+
+// clean up conn
+func (d *DataWorker) disconnect() {
+	if d.server != nil {
+		d.server.Close()
+	}
+
+	if d.conn != nil {
+		d.conn.Close()
+	}
+}
+
+func (d *DataWorker) retrieve(cb Callback) {
 	go func() {
-		defer d.Disconnect()
+		defer d.disconnect()
 		if d.transferReq == nil {
 			cb(fmt.Errorf("Received nil transferReq"), "")
 			return
@@ -58,6 +110,8 @@ func (d *DataWorker) retrieve(cb callback) {
 			cb(err, "")
 			return
 		}
+
+		defer fd.Close()
 
 		conn := <-d.connection
 		if conn.err != nil {
@@ -74,9 +128,9 @@ func (d *DataWorker) retrieve(cb callback) {
 	}()
 }
 
-func (d *DataWorker) store(cb callback) {
+func (d *DataWorker) store(cb Callback) {
 	go func() {
-		defer d.Disconnect()
+		defer d.disconnect()
 		conn := <-d.connection
 		bytes, _ := io.ReadAll(conn.socket)
 		fmt.Print(string(bytes))
@@ -159,49 +213,4 @@ func (d *DataWorker) createPort(req *Request) Response {
 	}
 
 	return CommandOK
-}
-
-func (d *DataWorker) Connect(req *Request) Response {
-	var response Response
-	if req.Cmd == "PASV" {
-		d.pasv = true
-		response = d.createPasv()
-	} else {
-		d.pasv = false
-		response = d.createPort(req)
-	}
-
-	return response
-}
-
-func (d *DataWorker) SetTransferRequest(req *Request) {
-	d.transferType = req.Cmd
-	d.transferReq = req
-}
-
-func (d *DataWorker) Start(cb callback) {
-	if d.transferType == "RETR" {
-		d.retrieve(cb)
-	} else if d.transferType == "STOR" {
-		d.store(cb)
-	}
-}
-
-// clean up conn
-func (d *DataWorker) Disconnect() {
-	if d.server != nil {
-		d.server.Close()
-	}
-
-	if d.conn != nil {
-		d.conn.Close()
-	}
-}
-
-// disconnect any open connections and
-// close any open channels
-// DataWorker is considered halted for use
-func (d *DataWorker) Stop() {
-	d.Disconnect()
-	close(d.connection)
 }

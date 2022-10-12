@@ -44,6 +44,15 @@ var accessControlTestCases = []struct {
 		HandlerErrCheck:  expectNilErr,
 		HandlerRespValue: NotLoggedIn,
 	},
+	{
+		TestName: "Test_User_Password_Incorrect",
+		Command:  "PASS password\r\n",
+		MutationFunc: func(w *ControlWorker) {
+			w.currentUser = "hkhan"
+		},
+		HandlerErrCheck:  expectNilErr,
+		HandlerRespValue: UserLoggedIn,
+	},
 }
 
 func expectNilErr(e error, t *testing.T) {

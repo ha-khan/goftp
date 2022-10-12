@@ -142,7 +142,6 @@ func (c *ControlWorker) handleMode(req *Request) (Response, error) {
 	}
 
 	c.mo = symbol
-
 	return CommandOK, nil
 }
 
@@ -176,7 +175,6 @@ func (c *ControlWorker) handleStrucure(req *Request) (Response, error) {
 	}
 
 	c.stru = symbol
-
 	return CommandOK, nil
 }
 
@@ -214,7 +212,7 @@ DATA PORT (PORT)
 */
 func (c *ControlWorker) handlePort(req *Request) (Response, error) {
 	c.currentCMD = Port
-	return c.dataWorker.Connect(req), nil
+	return c.IDataWorker.Connect(req), nil
 }
 
 /*
@@ -235,7 +233,7 @@ PASSIVE (PASV)
 */
 func (c *ControlWorker) handlePassive(req *Request) (Response, error) {
 	c.currentCMD = Pasv
-	return c.dataWorker.Connect(req), nil
+	return c.IDataWorker.Connect(req), nil
 }
 
 // RETR
@@ -254,7 +252,7 @@ func (c *ControlWorker) handlePassive(req *Request) (Response, error) {
 // back against the control connection, we then start the retrieve
 func (c *ControlWorker) handleRetrieve(req *Request) (Response, error) {
 	c.currentCMD = Retrieve
-	c.dataWorker.SetTransferRequest(req)
+	c.IDataWorker.SetTransferRequest(req)
 
 	return StartTransfer, nil
 }
@@ -272,7 +270,7 @@ func (c *ControlWorker) handleRetrieve(req *Request) (Response, error) {
 // back against the control connection, we then start the store
 func (w *ControlWorker) handleStore(req *Request) (Response, error) {
 	w.currentCMD = Store
-	w.dataWorker.SetTransferRequest(req)
+	w.IDataWorker.SetTransferRequest(req)
 
 	return StartTransfer, nil
 }

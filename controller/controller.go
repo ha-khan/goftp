@@ -13,6 +13,8 @@ var goFtp *GoFTP
 type GoFTP struct {
 	logger     logger.Client
 	dispatcher *dispatcher.Dispatcher
+	// TODO: eventually add a DataConnectionManager here
+	// which allows us to reuse open Ports
 }
 
 // BasicGoFTP returns a basic GOFTP instance
