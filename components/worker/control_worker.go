@@ -117,25 +117,21 @@ func (c *ControlWorker) Start(conn net.Conn) {
 			c.logger.Infof(fmt.Sprintf("Handler Error: %v", err))
 		}
 
-		// TODO: need to handle errors here for failed Pasv/Port
-		switch resp {
+		switch conn.Write(resp.Byte()); resp {
 		case UserQuit:
-			conn.Write(resp.Byte())
 			c.IDataWorker.Stop()
 			return
 		case StartTransfer:
-			conn.Write(resp.Byte())
 			c.IDataWorker.Start(func(err error, resp Response) {
 				if err != nil {
 					c.logger.Infof(fmt.Sprintf("Transfer Error: %v", err))
 				}
 
-				// conn is considered thread safe
 				conn.Write(resp.Byte())
 				c.currentCMD = None
 			})
 		default:
-			conn.Write(resp.Byte())
+			// pass through to next cmd since no "special" processing is required
 		}
 	}
 }
