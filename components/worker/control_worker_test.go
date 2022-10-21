@@ -2,28 +2,74 @@ package worker
 
 import (
 	"bufio"
-	"fmt"
 	"goftp/components/logger"
 	"net"
 	"testing"
 )
 
-// TODO: add fuzzing here and more complex chained interations
-// this should test end-to-end
-// TODO: use https://pkg.go.dev/net#Pipe to mock net.Conn without
-// using any networking resources
-func Test_Login(t *testing.T) {
+func Test_Start_And_Shutdown(t *testing.T) {
 	client, server := net.Pipe()
 	worker := NewControlWorker(logger.NewStdStreamClient())
 
 	go worker.Start(server)
 
 	scanner := bufio.NewScanner(client)
-	bufWriter := bufio.NewWriter(client)
+	writer := bufio.NewWriter(client)
+
 	scanner.Scan()
-	fmt.Println(scanner.Text())
-	bufWriter.WriteString("PWD\r\n")
-	bufWriter.Flush()
+	if resp := scanner.Text(); resp != string(ServiceReady) {
+		t.Errorf("Expected: %s, but got %s", string(ServiceReady), resp)
+		return
+
+	}
+
+	writer.WriteString("QUIT\r\n")
+	writer.Flush()
+
 	scanner.Scan()
-	fmt.Println(scanner.Text())
+	if resp := scanner.Text(); resp != string(UserQuit) {
+		t.Errorf("Expected: %s, but got %s", string(ServiceReady), resp)
+		return
+	}
+}
+
+func Test_User_Login(t *testing.T) {
+	client, server := net.Pipe()
+	worker := NewControlWorker(logger.NewStdStreamClient())
+
+	go worker.Start(server)
+
+	scanner := bufio.NewScanner(client)
+	writer := bufio.NewWriter(client)
+
+	scanner.Scan()
+	if resp := scanner.Text(); resp != string(ServiceReady) {
+		t.Errorf("Expected: %s, but got %s", string(ServiceReady), resp)
+		return
+
+	}
+
+	writer.WriteString("USER hkhan\r\n")
+	writer.Flush()
+	scanner.Scan()
+	if resp := scanner.Text(); resp != string(UserOkNeedPW) {
+		t.Errorf("Expected: %s, but got %s", string(UserOkNeedPW), resp)
+		return
+	}
+
+	writer.WriteString("PASS password\r\n")
+	writer.Flush()
+	scanner.Scan()
+	if resp := scanner.Text(); resp != string(UserLoggedIn) {
+		t.Errorf("Expected: %s, but got %s", string(UserLoggedIn), resp)
+		return
+	}
+
+	writer.WriteString("QUIT\r\n")
+	writer.Flush()
+	scanner.Scan()
+	if resp := scanner.Text(); resp != string(UserQuit) {
+		t.Errorf("Expected: %s, but got %s", string(ServiceReady), resp)
+		return
+	}
 }
