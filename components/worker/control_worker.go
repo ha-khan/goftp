@@ -38,22 +38,7 @@ type ControlWorker struct {
 	// "root" directory set at initialization time
 	pwd string
 
-	// Transfer Parameters, only accepting a subset from spec
-	//
-	// MODE command specifies how the bits of the data are to be transmitted
-	// S - Stream
-	mo rune
-	//
-	//
-	// STRUcture and TYPE commands, are used to define the way in which the data are to be represented.
-	//
-	// F - File (no structure, file is considered to be a sequence of data bytes)
-	// R - Record (must be accepted for "text" files (ASCII) )
-	stru rune
-	//
-	// A - ASCII (primarily for the transfer of text files <CRLF> used to denote end of text line)
-	// I - Image (data is sent as contiguous bits, which  are packed into 8-bit transfer bytes)
-	ty rune
+	transfer
 
 	// keeps track of currently executing command, if that command is considered
 	// complex ~ pasv/port/retr/...etc, and forces as specific sequence of allowable
@@ -70,12 +55,22 @@ func NewControlWorker(l logger.Client) *ControlWorker {
 		users: map[string]string{
 			"hkhan": "password",
 		},
-		pwd:         "/temp",
-		currentCMD:  "NONE",
-		mo:          'S', // Stream
-		stru:        'F', // File
-		ty:          'A', // ASCII
-		IDataWorker: NewDataWorker("/temp", l),
+		pwd:        "/temp",
+		currentCMD: "NONE",
+		transfer: transfer{
+			Mode:      'S', // Stream
+			Structure: 'F', // File
+			Type:      'A', // ASCII
+		},
+		IDataWorker: NewDataWorker(
+			transfer{
+				Mode:      'S', // Stream
+				Structure: 'F', // File
+				Type:      'A', // ASCII
+			},
+			"/temp",
+			l,
+		),
 	}
 }
 

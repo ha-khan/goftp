@@ -14,3 +14,4 @@ build-binary:
 
 clean:
 	rm -f ./bin/*
+	rm ./temp/main2.txt

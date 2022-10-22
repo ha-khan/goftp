@@ -112,7 +112,7 @@ func (c *ControlWorker) handleType(req *Request) (Response, error) {
 		return CmdNotImplementedForParam, nil
 	}
 
-	c.ty = symbol
+	c.Type = symbol
 	return CommandOK, nil
 }
 
@@ -141,7 +141,7 @@ func (c *ControlWorker) handleMode(req *Request) (Response, error) {
 		return CmdNotImplementedForParam, nil
 	}
 
-	c.mo = symbol
+	c.Mode = symbol
 	return CommandOK, nil
 }
 
@@ -170,11 +170,11 @@ func (c *ControlWorker) handleStrucure(req *Request) (Response, error) {
 		return CmdNotImplementedForParam, nil
 	}
 
-	if symbol == 'R' && c.ty != 'A' {
+	if symbol == 'R' && c.Type != 'A' {
 		return CmdNotImplementedForParam, nil
 	}
 
-	c.stru = symbol
+	c.Structure = symbol
 	return CommandOK, nil
 }
 

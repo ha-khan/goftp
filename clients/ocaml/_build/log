@@ -1,0 +1,5 @@
+# dune init project ftpclient
+# OCAMLPARAM: unset
+# Shared cache: disabled
+# Workspace root: /home/hk/Go/src/goftp/scripts/ocaml
+# Auto-detected concurrency: 8

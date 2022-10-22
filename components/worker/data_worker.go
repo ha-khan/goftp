@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"goftp/components/logger"
-	"io"
 	"net"
 	"os"
 	"strconv"
@@ -21,10 +20,15 @@ type IDataWorker interface {
 }
 
 type DataWorker struct {
+	// store references to both networking resources
+	// to close them when needed
 	server net.Listener
 	conn   net.Conn
 
-	// channel used to communicate with subsequent ~ Store, Retrieve, List, .. etc
+	// channel used to communicate with subsequent go routine
+	// spawned to handler ~ Store, Retrieve, List, ... etc
+	//
+	// from invocation in w.Start(...) in ClientWorker
 	connection chan struct {
 		socket net.Conn
 		err    error
@@ -35,20 +39,25 @@ type DataWorker struct {
 	host string
 	port uint16
 
-	pwd          string
-	pasv         bool
+	pwd string
+	transfer
+	pasv bool
+
+	// data worker is configured to work with s specific
+	// transfer request ~ Store, Retrieve, List, ... etc
 	transferReq  *Request
 	transferType string
 }
 
-func NewDataWorker(pwd string, logger logger.Client) *DataWorker {
+func NewDataWorker(t transfer, pwd string, logger logger.Client) *DataWorker {
 	return &DataWorker{
 		connection: make(chan struct {
 			socket net.Conn
 			err    error
 		}),
-		pwd:    pwd,
-		logger: logger,
+		pwd:      pwd,
+		logger:   logger,
+		transfer: t,
 	}
 }
 
@@ -68,6 +77,8 @@ func (d *DataWorker) Start(cb Callback) {
 // disconnect any open connections and
 // close any open channels
 // DataWorker is considered halted for use
+// TODO: need to implement graceful close of pending transfers
+// they should complete
 func (d *DataWorker) Stop() {
 	d.disconnect()
 	close(d.connection)
@@ -119,9 +130,12 @@ func (d *DataWorker) retrieve(cb Callback) {
 			return
 		}
 
+		// TODO: reading/sending of bytes is based off of transfer mode
 		scanner := bufio.NewScanner(fd)
+		sender := bufio.NewWriter(conn.socket)
 		for scanner.Scan() {
-			conn.socket.Write(append(scanner.Bytes(), []byte("\n")...))
+			sender.Write(append(scanner.Bytes(), []byte("\n")...))
+			sender.Flush()
 		}
 
 		cb(nil, TransferComplete)
@@ -132,8 +146,23 @@ func (d *DataWorker) store(cb Callback) {
 	go func() {
 		defer d.disconnect()
 		conn := <-d.connection
-		bytes, _ := io.ReadAll(conn.socket)
-		fmt.Print(string(bytes))
+
+		fd, err := os.Create("." + d.pwd + "/" + d.transferReq.Arg)
+		if err != nil {
+			cb(err, "")
+			return
+		}
+		defer fd.Close()
+
+		diskWriter := bufio.NewWriter(fd)
+
+		// read text into memory and then write to disk
+		// FIXME: no way to know if ascii from client has new line at end
+		for scanner := bufio.NewScanner(conn.socket); scanner.Scan(); {
+			text := scanner.Text()
+			diskWriter.WriteString(text + "\n")
+			diskWriter.Flush()
+		}
 
 		cb(nil, TransferComplete)
 	}()
@@ -144,7 +173,9 @@ func (d *DataWorker) list() {
 }
 
 func (d *DataWorker) delete() {
-
+	// TODO: need to lock file if its being used for read/store
+	//
+	//	delete shouldn't impact that
 }
 
 func (d *DataWorker) createPasv() Response {

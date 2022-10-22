@@ -8,7 +8,7 @@ if __name__ == '__main__':
         client.login('hkhan', 'password')
         client.voidcmd("NOOP")
         with io.BytesIO(bytes(b'hello world')) as fp:
-            client.storlines("STOR main.txt", fp)
+            client.storlines("STOR main2.txt", fp)
         # client.retrlines('RETR main.txt')
         # with open('main.txt', 'wb') as fd:
         #     client.retrbinary('RETR main.txt', fd.write)
