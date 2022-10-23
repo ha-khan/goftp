@@ -38,7 +38,7 @@ type ControlWorker struct {
 	// "root" directory set at initialization time
 	pwd string
 
-	transfer
+	Transfer
 
 	// keeps track of currently executing command, if that command is considered
 	// complex ~ pasv/port/retr/...etc, and forces as specific sequence of allowable
@@ -55,22 +55,10 @@ func NewControlWorker(l logger.Client) *ControlWorker {
 		users: map[string]string{
 			"hkhan": "password",
 		},
-		pwd:        "/temp",
-		currentCMD: "NONE",
-		transfer: transfer{
-			Mode:      'S', // Stream
-			Structure: 'F', // File
-			Type:      'A', // ASCII
-		},
-		IDataWorker: NewDataWorker(
-			transfer{
-				Mode:      'S', // Stream
-				Structure: 'F', // File
-				Type:      'A', // ASCII
-			},
-			"/temp",
-			l,
-		),
+		pwd:         "/temp",
+		currentCMD:  "NONE",
+		Transfer:    NewDefaultTransfer(),
+		IDataWorker: NewDataWorker(NewDefaultTransfer(), "/temp", l),
 	}
 }
 

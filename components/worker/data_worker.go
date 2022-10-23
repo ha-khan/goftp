@@ -40,7 +40,7 @@ type DataWorker struct {
 	port uint16
 
 	pwd string
-	transfer
+	Transfer
 	pasv bool
 
 	// data worker is configured to work with s specific
@@ -49,7 +49,7 @@ type DataWorker struct {
 	transferType string
 }
 
-func NewDataWorker(t transfer, pwd string, logger logger.Client) *DataWorker {
+func NewDataWorker(t Transfer, pwd string, logger logger.Client) *DataWorker {
 	return &DataWorker{
 		connection: make(chan struct {
 			socket net.Conn
@@ -57,7 +57,7 @@ func NewDataWorker(t transfer, pwd string, logger logger.Client) *DataWorker {
 		}),
 		pwd:      pwd,
 		logger:   logger,
-		transfer: t,
+		Transfer: t,
 	}
 }
 

@@ -1,7 +1,7 @@
 package worker
 
 // Transfer Parameters, only accepting a subset from spec
-type transfer struct {
+type Transfer struct {
 	// MODE command specifies how the bits of the data are to be transmitted
 	// S - Stream
 	Mode rune
@@ -17,4 +17,12 @@ type transfer struct {
 	// A - ASCII (primarily for the transfer of text files <CRLF> used to denote end of text line)
 	// I - Image (data is sent as contiguous bits, which  are packed into 8-bit transfer bytes)
 	Type rune
+}
+
+func NewDefaultTransfer() Transfer {
+	return Transfer{
+		Mode:      'S', // Stream
+		Structure: 'F', // File
+		Type:      'A', // ASCII
+	}
 }
