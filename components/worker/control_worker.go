@@ -43,7 +43,7 @@ type ControlWorker struct {
 	// keeps track of currently executing command, if that command is considered
 	// complex ~ pasv/port/retr/...etc, and forces as specific sequence of allowable
 	// commands to be called if set to a value other than 'None'
-	currentCMD CMD
+	executing CMD
 
 	// there is a 1-to-1 relation between ControlWorkers and DataWorkers
 	IDataWorker
@@ -56,7 +56,7 @@ func NewControlWorker(l logger.Client) *ControlWorker {
 			"hkhan": "password",
 		},
 		pwd:         "/temp",
-		currentCMD:  "NONE",
+		executing:   "NONE",
 		Transfer:    NewDefaultTransfer(),
 		IDataWorker: NewDataWorker(NewDefaultTransfer(), "/temp", l),
 	}
@@ -111,7 +111,7 @@ func (c *ControlWorker) Start(conn net.Conn) {
 				}
 
 				conn.Write(resp.Byte())
-				c.currentCMD = None
+				c.executing = None
 			})
 		default:
 			// pass through to next cmd since no "special" processing is required

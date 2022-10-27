@@ -6,54 +6,6 @@ import (
 
 type Handler func(*Request) (Response, error)
 
-func (c ControlWorker) checkIfLoggedIn(fn Handler) Handler {
-	return func(req *Request) (Response, error) {
-		if c.loggedIn {
-			return fn(req)
-		}
-
-		c.logger.Infof(fmt.Sprintf("client not authenticated to run CMD"))
-		return NotLoggedIn, nil
-	}
-}
-
-func (c *ControlWorker) handleUserLogin(req *Request) (Response, error) {
-	if c.loggedIn {
-		return UserLoggedIn, nil
-	}
-
-	if _, ok := c.users[req.Arg]; !ok {
-		c.logger.Infof(fmt.Sprintf("username: %s, not recognized", req.Arg))
-		return NotLoggedIn, nil
-	}
-
-	// set current user for this worker
-	c.currentUser = req.Arg
-	return UserOkNeedPW, nil
-}
-
-func (c *ControlWorker) handleUserPassword(req *Request) (Response, error) {
-	if pw, ok := c.users[c.currentUser]; ok {
-		if pw == req.Arg {
-			c.loggedIn = true
-			return UserLoggedIn, nil
-		}
-	}
-
-	c.logger.Infof(fmt.Sprintf("incorrect password received for username %s", c.currentUser))
-	return NotLoggedIn, nil
-}
-
-func (c *ControlWorker) handleReinitialize(req *Request) (Response, error) {
-	c.currentUser = ""
-	c.loggedIn = false
-	return Response(fmt.Sprintf(string(DirectoryResponse), c.pwd)), nil
-}
-
-func (c ControlWorker) handleQuit(req *Request) (Response, error) {
-	return UserQuit, nil
-}
-
 func (c ControlWorker) handlePWD(req *Request) (Response, error) {
 	return Response(fmt.Sprintf(string(DirectoryResponse), c.pwd)), nil
 }
@@ -62,16 +14,31 @@ func (c ControlWorker) handleNoop(req *Request) (Response, error) {
 	return CommandOK, nil
 }
 
-func (c ControlWorker) handleSyntaxErrorParams(req *Request) (Response, error) {
-	return SyntaxError2, nil
+// Transfer Parameters, only accepting a subset from spec
+type Transfer struct {
+	// MODE command specifies how the bits of the data are to be transmitted
+	// S - Stream
+	Mode rune
+	//
+	//
+	// STRUcture and TYPE commands, are used to define the way in which the data are to be represented.
+	//
+	// F - File (no structure, file is considered to be a sequence of data bytes)
+	// R - Record (must be accepted for "text" files (ASCII) )
+	Structure rune
+	//
+	//
+	// A - ASCII (primarily for the transfer of text files <CRLF> used to denote end of text line)
+	// I - Image (data is sent as contiguous bits, which  are packed into 8-bit transfer bytes)
+	Type rune
 }
 
-func (c ControlWorker) handleSyntaxErrorInvalidCmd(req *Request) (Response, error) {
-	return SyntaxError1, nil
-}
-
-func (c ControlWorker) handleCmdNotImplemented(req *Request) (Response, error) {
-	return CmdNotImplemented, nil
+func NewDefaultTransfer() Transfer {
+	return Transfer{
+		Mode:      'S', // Stream
+		Structure: 'F', // File
+		Type:      'A', // ASCII
+	}
 }
 
 /*
@@ -178,16 +145,18 @@ func (c *ControlWorker) handleStrucure(req *Request) (Response, error) {
 	return CommandOK, nil
 }
 
+//---------------------------------------------------------------------------
+
 // DELE
 //
 //	250
 //	450, 550
 //	500, 501, 502, 421, 530
 func (c *ControlWorker) handleDelete(req *Request) (Response, error) {
+	c.executing = Delete
 	return TransferComplete, nil
 }
 
-//---------------------------------------------------------------------------
 /*
 DATA PORT (PORT)
 
@@ -207,11 +176,9 @@ DATA PORT (PORT)
 
 	where h1 is the high order 8 bits of the internet host
 	address.
-
-	FIXME: need to make this resilient against weird cmd sequences
 */
 func (c *ControlWorker) handlePort(req *Request) (Response, error) {
-	c.currentCMD = Port
+	c.executing = Port
 	return c.IDataWorker.Connect(req), nil
 }
 
@@ -228,11 +195,9 @@ PASSIVE (PASV)
 	This address information is broken into 8-bit fields and the
 	value of each field is transmitted as a decimal number (in
 	character string representation).
-
-	FIXME: Need to make this resilient against weird cmd sequences
 */
 func (c *ControlWorker) handlePassive(req *Request) (Response, error) {
-	c.currentCMD = Pasv
+	c.executing = Pasv
 	return c.IDataWorker.Connect(req), nil
 }
 
@@ -244,14 +209,8 @@ func (c *ControlWorker) handlePassive(req *Request) (Response, error) {
 //	   425, 426, 451
 //	450, 550
 //	500, 501, 421, 530
-//
-// TODO: Need to take into account the TYPE command
-// if TYPE A, we can use a generic scanner, else
-//
-// TODO: need to coordinate, after sending StartTransfer response
-// back against the control connection, we then start the retrieve
 func (c *ControlWorker) handleRetrieve(req *Request) (Response, error) {
-	c.currentCMD = Retrieve
+	c.executing = Retrieve
 	c.IDataWorker.SetTransferRequest(req)
 
 	return StartTransfer, nil
@@ -265,11 +224,8 @@ func (c *ControlWorker) handleRetrieve(req *Request) (Response, error) {
 //	   425, 426, 451, 551, 552
 //	532, 450, 452, 553
 //	500, 501, 421, 530
-//
-// TODO: need to coordinate, after sending StartTransfer response
-// back against the control connection, we then start the store
 func (w *ControlWorker) handleStore(req *Request) (Response, error) {
-	w.currentCMD = Store
+	w.executing = Store
 	w.IDataWorker.SetTransferRequest(req)
 
 	return StartTransfer, nil

@@ -68,3 +68,15 @@ func (c *ControlWorker) Parse(request string) (Handler, *Request, error) {
 
 	return c.checkIfLoggedIn(handler), req, nil
 }
+
+func (c ControlWorker) handleSyntaxErrorParams(req *Request) (Response, error) {
+	return SyntaxError2, nil
+}
+
+func (c ControlWorker) handleSyntaxErrorInvalidCmd(req *Request) (Response, error) {
+	return SyntaxError1, nil
+}
+
+func (c ControlWorker) handleCmdNotImplemented(req *Request) (Response, error) {
+	return CmdNotImplemented, nil
+}

@@ -22,6 +22,12 @@ var baseReject = map[CMD]any{
 }
 
 // currentCMD -> requestedCMD --> Reject ~ true | false
+//
+//		NONE -> Delete -------------------------> NONE
+//	       \                                       ^
+//		    \                                     /
+//		     v                                   /
+//		     (PORT | PASV) -> (Store | Retrieve)
 var table = map[CMD]map[CMD]any{
 	None: {
 		Retrieve: nil,
@@ -31,12 +37,14 @@ var table = map[CMD]map[CMD]any{
 	Retrieve: baseReject,
 	Delete:   baseReject,
 	Pasv: {
-		Pasv: nil,
-		Port: nil,
+		Pasv:   nil,
+		Port:   nil,
+		Delete: nil,
 	},
 	Port: {
-		Port: nil,
-		Pasv: nil,
+		Port:   nil,
+		Pasv:   nil,
+		Delete: nil,
 	},
 }
 
@@ -44,12 +52,12 @@ var table = map[CMD]map[CMD]any{
 // be invoked
 //
 // forces a sequence when Port/Pasv is invoked, signaling that the next
-// operation should be somekind of data transfer (Store/Retrieve), which would
+// operation should be some kind of data transfer (Store/Retrieve), which would
 // eventually return the worker to an "idle" state.
 //
 // configuration and other lcm commands are however still accepted,
 func (c *ControlWorker) RejectCMD(requested *Request) bool {
-	_, reject := table[c.currentCMD][CMD(requested.Cmd)]
+	_, reject := table[c.executing][CMD(requested.Cmd)]
 
 	return reject
 }
