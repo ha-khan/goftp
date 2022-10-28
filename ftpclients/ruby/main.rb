@@ -1,9 +1,12 @@
 require 'net/ftp'
 
-ftp = Net::FTP.new('localhost', {:port=>2023})
-ftp.login('hkhan', 'password')
-ftp.retrlines('RETR main.txt') do |data| 
-    puts data
+
+Net::FTP.open('localhost', {:port=>2023}) do |ftp|
+    ftp.login('hkhan', 'password')
+
+    ftp.retrlines('RETR main.txt') do |data|
+        puts data
+    end
+
+    ftp.quit()
 end
-ftp.quit()
-ftp.close()
