@@ -1,6 +1,7 @@
 package dispatcher
 
 import (
+	"errors"
 	"fmt"
 	"goftp/components/logger"
 	"goftp/components/worker"
@@ -28,7 +29,7 @@ func New(log logger.Client) *Dispatcher {
 
 // Start kicks off the reactor loop for each control connections initiated by some ftp client
 func (d *Dispatcher) Start() {
-	d.logger.Infof("Dispatcher starting")
+	d.logger.Infof("Dispatcher starting up...")
 
 	var err error
 	d.server, err = net.Listen("tcp", ":2023")
@@ -37,19 +38,16 @@ func (d *Dispatcher) Start() {
 	}
 
 	for {
-		d.logger.Infof("Waiting for connection")
+		d.logger.Infof("Dispatcher waiting for connections")
 
 		conn, err := d.server.Accept()
 		if err != nil {
-			// write back to connection that error with server
-
-			// TODO: need to rethink this scenario, main thread would still be blocking, should
-			//       probably throw panic to kill process
-			//       can invoke some cancel context passed to each worker to finish processing a
-			//       request
-			fmt.Println(err.Error())
-			d.logger.Infof("Stopping server")
-			return
+			if errors.Is(err, net.ErrClosed) {
+				d.logger.Infof("Dispatcher shutdown complete")
+				return
+			}
+			d.logger.Infof(fmt.Sprintf("Dispatcher connection error: %v", err))
+			continue
 		}
 
 		go worker.NewControlWorker(d.logger).Start(conn)
@@ -57,7 +55,7 @@ func (d *Dispatcher) Start() {
 }
 
 func (d *Dispatcher) Stop() {
-	d.logger.Infof("Dispatcher stopping")
+	d.logger.Infof("Dispatcher shutting down...")
 	// TODO:, need to keep track of all outstanding workers
 	// which themselves have a connection that they are processing
 	// can close gracefully or keep them alive until the client closes them

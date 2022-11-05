@@ -13,7 +13,8 @@ import (
 // ftp is stateful protocol, which means that a given request is handled
 // based off of how the previous requests were handled
 //
-// # Thus a worker will be modeled after a finite-state machine
+// each worker will be modeled after a finite-state machine, primarily for requests/events
+// that require a specific sequence (PASV, STOR, ..etc)
 //
 // those previous requests set specific state information
 // (loggedIn, pwd, mo, stru, ty, currentOp), this tuple will be used to accept/reject a
@@ -22,9 +23,6 @@ import (
 // in RFC 959 terms, this worker would be known as the Server-PI,
 // ftp is a request/response protocol and each read (request) will have its write (response)
 // execution of the handler is done
-//
-// ftp connections are terminated at will by the client
-// need to keep track of session information, which is done by using a struct
 type ControlWorker struct {
 	logger logger.Client
 
