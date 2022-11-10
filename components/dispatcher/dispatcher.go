@@ -1,11 +1,14 @@
 package dispatcher
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"goftp/components/logger"
 	"goftp/components/worker"
 	"net"
+	"sync"
+	"time"
 )
 
 type Dispatcher struct {
@@ -16,14 +19,16 @@ type Dispatcher struct {
 	// usually 21
 	port string
 
-	// cancelFunc
 	// TODO: store connection pool for PASV
+	shutdown context.CancelFunc
+	wg       *sync.WaitGroup
 }
 
 // TODO: make more configurable such as TLS TCP server
 func New(log logger.Client) *Dispatcher {
 	return &Dispatcher{
 		logger: log,
+		wg:     new(sync.WaitGroup),
 	}
 }
 
@@ -37,6 +42,8 @@ func (d *Dispatcher) Start() {
 		panic(err.Error())
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	d.shutdown = cancel
 	for {
 		d.logger.Infof("Dispatcher waiting for connections")
 
@@ -50,7 +57,13 @@ func (d *Dispatcher) Start() {
 			continue
 		}
 
-		go worker.NewControlWorker(d.logger).Start(conn)
+		// TODO: pass a cancel context to each spawned worker
+		// to gracefully shutdown
+		d.wg.Add(1)
+		go func() {
+			worker.NewControlWorker(d.logger).Start(ctx, conn)
+			d.wg.Done()
+		}()
 	}
 }
 
@@ -62,4 +75,20 @@ func (d *Dispatcher) Stop() {
 	// regardless the dispatcher needs to stop accepting new connections at a
 	// minimum
 	d.server.Close()
+	d.shutdown()
+
+	done := make(chan struct{}, 1)
+	go func() {
+		d.wg.Wait()
+		done <- struct{}{}
+	}()
+
+	timeout := time.Tick(1 * time.Minute)
+
+	select {
+	case <-timeout:
+		d.logger.Infof("Timeout received for shutdown, exiting")
+	case <-done:
+		d.logger.Infof("Graceful shutdown done, exiting")
+	}
 }

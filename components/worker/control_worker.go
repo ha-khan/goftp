@@ -2,6 +2,7 @@ package worker
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"goftp/components/logger"
 	"net"
@@ -66,7 +67,7 @@ func NewControlWorker(l logger.Client) *ControlWorker {
 // much of the core logic that drives the control connection is
 // handled here such as errors, responses, and more complex workflows
 // such as the actual transfer of bytes across the data connection
-func (c *ControlWorker) Start(conn net.Conn) {
+func (c *ControlWorker) Start(ctx context.Context, conn net.Conn) {
 	defer func() {
 		c.logger.Infof("Closing Control Connection")
 		conn.Close()

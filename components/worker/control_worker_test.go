@@ -2,6 +2,7 @@ package worker
 
 import (
 	"bufio"
+	"context"
 	"goftp/components/logger"
 	"net"
 	"testing"
@@ -11,7 +12,7 @@ func Test_Start_And_Shutdown(t *testing.T) {
 	client, server := net.Pipe()
 	worker := NewControlWorker(logger.NewStdStreamClient())
 
-	go worker.Start(server)
+	go worker.Start(context.TODO(), server)
 
 	scanner := bufio.NewScanner(client)
 	writer := bufio.NewWriter(client)
@@ -37,7 +38,7 @@ func Test_User_Login(t *testing.T) {
 	client, server := net.Pipe()
 	worker := NewControlWorker(logger.NewStdStreamClient())
 
-	go worker.Start(server)
+	go worker.Start(context.TODO(), server)
 
 	scanner := bufio.NewScanner(client)
 	writer := bufio.NewWriter(client)

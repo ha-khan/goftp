@@ -38,7 +38,7 @@ func (g *GoFTP) Start() {
 
 // Stop stops all the internal components that
 func (g *GoFTP) Stop() {
-	g.logger.Infof("Gracefully shutting down GoFTP...")
+	g.logger.Infof("Shutting down GoFTP...")
 	g.dispatcher.Stop()
-	g.logger.Infof("GoFTP graceful shutdown complete, exiting")
+	g.logger.Infof("GoFTP shutdown complete, exiting")
 }
