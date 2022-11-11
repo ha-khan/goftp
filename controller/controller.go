@@ -1,8 +1,8 @@
 package controller
 
 import (
-	"goftp/components/dispatcher"
-	"goftp/components/logger"
+	"goftp/internal/dispatcher"
+	"goftp/internal/logger"
 	"sync"
 )
 

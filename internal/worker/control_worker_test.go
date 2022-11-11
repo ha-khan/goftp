@@ -3,7 +3,7 @@ package worker
 import (
 	"bufio"
 	"context"
-	"goftp/components/logger"
+	"goftp/internal/logger"
 	"net"
 	"testing"
 )

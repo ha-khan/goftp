@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"goftp/components/logger"
+	"goftp/internal/logger"
 	"net"
 )
 

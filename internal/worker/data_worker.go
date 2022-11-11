@@ -3,7 +3,7 @@ package worker
 import (
 	"bufio"
 	"fmt"
-	"goftp/components/logger"
+	"goftp/internal/logger"
 	"net"
 	"os"
 	"strconv"

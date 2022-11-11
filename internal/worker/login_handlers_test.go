@@ -1,7 +1,7 @@
 package worker
 
 import (
-	"goftp/components/logger"
+	"goftp/internal/logger"
 	"testing"
 )
 
