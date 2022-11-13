@@ -39,13 +39,20 @@ type ControlWorker struct {
 
 	Transfer
 
+	dataTransferResponse chan Response
+
 	// keeps track of currently executing command, if that command is considered
 	// complex ~ pasv/port/retr/...etc, and forces as specific sequence of allowable
 	// commands to be called if set to a value other than 'None'
 	executing CMD
 
 	// there is a 1-to-1 relation between ControlWorkers and DataWorkers
-	IDataWorker
+	IDataWorker interface {
+		Start(chan Response)
+		Stop()
+		SetTransferRequest(*Request)
+		Connect(*Request) Response
+	}
 }
 
 func NewControlWorker(l logger.Client) *ControlWorker {
@@ -90,7 +97,7 @@ func (c *ControlWorker) Start(ctx context.Context, conn net.Conn) {
 
 		if reject := c.RejectCMD(req); reject {
 			handler = func(r *Request) (Response, error) {
-				return FileActionNotTaken, nil
+				return BadSequence, nil
 			}
 		}
 
@@ -104,24 +111,28 @@ func (c *ControlWorker) Start(ctx context.Context, conn net.Conn) {
 			c.IDataWorker.Stop()
 			return
 		case StartTransfer:
-			c.IDataWorker.Start(func(err error, resp Response) {
-				if err != nil {
-					c.logger.Infof(fmt.Sprintf("Transfer Error: %v", err))
-				}
-
+			c.dataTransferResponse = make(chan Response)
+			go func() {
+				defer close(c.dataTransferResponse)
+				resp := <-c.dataTransferResponse
 				conn.Write(resp.Byte())
 				c.executing = None
-			})
+			}()
+			c.IDataWorker.Start(c.dataTransferResponse)
 		default:
 			// pass through to next cmd since no "special" processing is required
 		}
 	}
 }
 
-// TODO: implement this method to close any resources (channels, connections, etc)
-// thus ending this Worker
-func (c *ControlWorker) Stop() {
-	// gracefully shutdown worker
-	// reject all subsequent commands
+// There are two possible states in which Stop() can be called
+// 1. No transfer is happening, ControlWorker is in a 'None' processing state
+// 2. A transfer is happening, ControlWorker is in some State other than 'None'
+// we poll and check whether controlworker is finished executing its state before
+// closing the DataWorker.
+// main thing we need to figure out is how to coordinate a response back to the
+// ftp client and closing the socket, who shoould close the conn?
+func (c *ControlWorker) Stop(ctx context.Context) {
+	<-ctx.Done()
 	c.IDataWorker.Stop()
 }

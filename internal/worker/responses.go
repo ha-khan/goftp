@@ -35,6 +35,8 @@ const (
 // 400s
 const (
 	CannotOpenDataConnection Response = "425 Can't open data connection"
+	ServiceNotAvailable               = "421 Service not available, closing control connection"
+	TransferAborted                   = "426 Connection closed; transfer aborted"
 	FileActionNotTaken                = "450 Requested file action not taken"
 )
 
@@ -43,6 +45,8 @@ const (
 	SyntaxError1              Response = "500 Syntax error, command unrecognized"
 	SyntaxError2              Response = "501 Syntax error in parameters or arguments"
 	CmdNotImplemented         Response = "502 Command not implemented"
+	BadSequence               Response = "503 Bad sequence of commands"
 	CmdNotImplementedForParam Response = "504 Command not implemented for that parameter"
 	NotLoggedIn               Response = "530 Not logged in"
+	FileNotFound              Response = "550 Requested action not taken"
 )

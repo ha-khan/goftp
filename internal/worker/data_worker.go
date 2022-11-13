@@ -10,15 +10,6 @@ import (
 	"strings"
 )
 
-type Callback func(error, Response)
-
-type IDataWorker interface {
-	Start(Callback)
-	Stop()
-	SetTransferRequest(*Request)
-	Connect(*Request) Response
-}
-
 type DataWorker struct {
 	// store references to both networking resources
 	// to close them when needed
@@ -66,11 +57,11 @@ func (d *DataWorker) SetTransferRequest(req *Request) {
 	d.transferReq = req
 }
 
-func (d *DataWorker) Start(cb Callback) {
+func (d *DataWorker) Start(resp chan Response) {
 	if d.transferType == "RETR" {
-		d.retrieve(cb)
+		d.retrieve(resp)
 	} else if d.transferType == "STOR" {
-		d.store(cb)
+		d.store(resp)
 	}
 }
 
@@ -108,25 +99,24 @@ func (d *DataWorker) disconnect() {
 	}
 }
 
-func (d *DataWorker) retrieve(cb Callback) {
+func (d *DataWorker) retrieve(resp chan Response) {
 	go func() {
 		defer d.disconnect()
 		if d.transferReq == nil {
-			cb(fmt.Errorf("Received nil transferReq"), "")
+			resp <- SyntaxError2
 			return
 		}
 
 		fd, err := os.Open("./" + d.pwd + "/" + d.transferReq.Arg)
 		if err != nil {
-			cb(err, "")
+			resp <- FileNotFound
 			return
 		}
-
 		defer fd.Close()
 
 		conn := <-d.connection
 		if conn.err != nil {
-			cb(conn.err, "")
+			resp <- CannotOpenDataConnection
 			return
 		}
 
@@ -138,18 +128,23 @@ func (d *DataWorker) retrieve(cb Callback) {
 			sender.Flush()
 		}
 
-		cb(nil, TransferComplete)
+		resp <- TransferComplete
 	}()
 }
 
-func (d *DataWorker) store(cb Callback) {
+func (d *DataWorker) store(resp chan Response) {
 	go func() {
 		defer d.disconnect()
+
 		conn := <-d.connection
+		if conn.err != nil {
+			resp <- CannotOpenDataConnection
+			return
+		}
 
 		fd, err := os.Create("." + d.pwd + "/" + d.transferReq.Arg)
 		if err != nil {
-			cb(err, "")
+			resp <- FileNotFound
 			return
 		}
 		defer fd.Close()
@@ -164,7 +159,7 @@ func (d *DataWorker) store(cb Callback) {
 			diskWriter.Flush()
 		}
 
-		cb(nil, TransferComplete)
+		resp <- TransferComplete
 	}()
 }
 
