@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func Test_Start_And_Shutdown(t *testing.T) {
+func Test_Start_And_Quit(t *testing.T) {
 	client, server := net.Pipe()
 	worker := NewControlWorker(logger.NewStdStreamClient(), server)
 
@@ -29,7 +29,30 @@ func Test_Start_And_Shutdown(t *testing.T) {
 
 	scanner.Scan()
 	if resp := scanner.Text(); resp != string(UserQuit) {
+		t.Errorf("Expected: %s, but got %s", string(UserQuit), resp)
+		return
+	}
+}
+
+func Test_Start_And_OS_Shutdown(t *testing.T) {
+	client, server := net.Pipe()
+	worker := NewControlWorker(logger.NewStdStreamClient(), server)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go worker.Start(ctx)
+
+	scanner := bufio.NewScanner(client)
+	scanner.Scan()
+	if resp := scanner.Text(); resp != string(ServiceReady) {
 		t.Errorf("Expected: %s, but got %s", string(ServiceReady), resp)
+		return
+	}
+	cancel()
+
+	scanner.Scan()
+	if resp := scanner.Text(); resp != string(ServiceNotAvailable) {
+		t.Errorf("Expected: %s, but got %s", string(ServiceNotAvailable), resp)
 		return
 	}
 }
@@ -70,7 +93,7 @@ func Test_User_Login(t *testing.T) {
 	writer.Flush()
 	scanner.Scan()
 	if resp := scanner.Text(); resp != string(UserQuit) {
-		t.Errorf("Expected: %s, but got %s", string(ServiceReady), resp)
+		t.Errorf("Expected: %s, but got %s", string(UserQuit), resp)
 		return
 	}
 }

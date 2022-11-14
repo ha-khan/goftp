@@ -125,6 +125,7 @@ func (d *DataWorker) retrieve(resp chan Response) {
 			return
 		}
 
+		//-----------------------------------------------------------------------
 		// TODO: reading/sending of bytes is based off of transfer mode
 		scanner := bufio.NewScanner(fd)
 		sender := bufio.NewWriter(conn.socket)
@@ -132,6 +133,7 @@ func (d *DataWorker) retrieve(resp chan Response) {
 			sender.Write(append(scanner.Bytes(), []byte("\n")...))
 			sender.Flush()
 		}
+		//-----------------------------------------------------------------------
 
 		resp <- TransferComplete
 	}()
@@ -160,6 +162,8 @@ func (d *DataWorker) store(resp chan Response) {
 
 		diskWriter := bufio.NewWriter(fd)
 
+		//-----------------------------------------------------------------------
+		// TODO: reading/sending of bytes is based off of transfer mode
 		// read text into memory and then write to disk
 		// FIXME: no way to know if ascii from client has new line at end
 		for scanner := bufio.NewScanner(conn.socket); scanner.Scan(); {
@@ -167,6 +171,7 @@ func (d *DataWorker) store(resp chan Response) {
 			diskWriter.WriteString(text + "\n")
 			diskWriter.Flush()
 		}
+		//-----------------------------------------------------------------------
 
 		resp <- TransferComplete
 	}()

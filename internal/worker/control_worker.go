@@ -40,7 +40,7 @@ type ControlWorker struct {
 	Transfer
 
 	quit                 chan struct{}
-	dataTransferResponse chan chan Response // indirection of channels helps with clean up resources in possible race during shutdown
+	dataTransferResponse chan chan Response
 	connection           net.Conn
 
 	// keeps track of currently executing command, if that command is considered
@@ -48,7 +48,6 @@ type ControlWorker struct {
 	// commands to be called if set to a value other than 'None'
 	executing CMD
 
-	// there is a 1-to-1 relation between ControlWorkers and DataWorkers
 	IDataWorker interface {
 		Start(chan Response)
 		Stop()
@@ -68,7 +67,7 @@ func NewControlWorker(l logger.Client, conn net.Conn) *ControlWorker {
 		Transfer:             NewDefaultTransfer(),
 		IDataWorker:          NewDataWorker(NewDefaultTransfer(), "/temp", l),
 		connection:           conn,
-		quit:                 make(chan struct{}),
+		quit:                 make(chan struct{}, 2),
 		dataTransferResponse: make(chan chan Response),
 	}
 }
@@ -82,6 +81,8 @@ func NewControlWorker(l logger.Client, conn net.Conn) *ControlWorker {
 func (c *ControlWorker) Start(ctx context.Context) {
 	defer func() {
 		c.quit <- struct{}{}
+		close(c.quit)
+		close(c.dataTransferResponse)
 	}()
 	go c.TransferResponse(ctx)
 
@@ -115,9 +116,6 @@ func (c *ControlWorker) Start(ctx context.Context) {
 		case UserQuit:
 			return
 		case StartTransfer:
-			// create another channel, pass it to the dataTransferResponse Channel
-			// channel will be closed by sender, unbuffered is necesarry for unblocking
-			// sender
 			pipe := make(chan Response, 2)
 			c.dataTransferResponse <- pipe
 			c.IDataWorker.Start(pipe)
@@ -131,8 +129,6 @@ func (c *ControlWorker) TransferResponse(ctx context.Context) {
 	defer func() {
 		c.IDataWorker.Stop()
 		c.connection.Close()
-		close(c.dataTransferResponse)
-		close(c.quit)
 		c.logger.Infof("Closing Control Connection")
 	}()
 	for {
@@ -140,6 +136,8 @@ func (c *ControlWorker) TransferResponse(ctx context.Context) {
 		case <-ctx.Done():
 			if c.executing != None {
 				c.connection.Write(TransferAborted.Byte())
+			} else {
+				c.connection.Write(ServiceNotAvailable.Byte())
 			}
 			return
 		case pipe := <-c.dataTransferResponse:
