@@ -58,7 +58,7 @@ func (d *Dispatcher) Start() {
 
 		d.wg.Add(1)
 		go func() {
-			worker.NewControlWorker(d.logger).Start(ctx, conn)
+			worker.NewControlWorker(d.logger, conn).Start(ctx)
 			d.wg.Done()
 		}()
 	}

@@ -10,9 +10,9 @@ import (
 
 func Test_Start_And_Shutdown(t *testing.T) {
 	client, server := net.Pipe()
-	worker := NewControlWorker(logger.NewStdStreamClient())
+	worker := NewControlWorker(logger.NewStdStreamClient(), server)
 
-	go worker.Start(context.TODO(), server)
+	go worker.Start(context.TODO())
 
 	scanner := bufio.NewScanner(client)
 	writer := bufio.NewWriter(client)
@@ -36,9 +36,9 @@ func Test_Start_And_Shutdown(t *testing.T) {
 
 func Test_User_Login(t *testing.T) {
 	client, server := net.Pipe()
-	worker := NewControlWorker(logger.NewStdStreamClient())
+	worker := NewControlWorker(logger.NewStdStreamClient(), server)
 
-	go worker.Start(context.TODO(), server)
+	go worker.Start(context.TODO())
 
 	scanner := bufio.NewScanner(client)
 	writer := bufio.NewWriter(client)

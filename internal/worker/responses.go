@@ -35,9 +35,9 @@ const (
 // 400s
 const (
 	CannotOpenDataConnection Response = "425 Can't open data connection"
-	ServiceNotAvailable               = "421 Service not available, closing control connection"
-	TransferAborted                   = "426 Connection closed; transfer aborted"
-	FileActionNotTaken                = "450 Requested file action not taken"
+	ServiceNotAvailable      Response = "421 Service not available, closing control connection"
+	TransferAborted          Response = "426 Connection closed; transfer aborted"
+	FileActionNotTaken       Response = "450 Requested file action not taken"
 )
 
 // 500s

@@ -101,7 +101,12 @@ func (d *DataWorker) disconnect() {
 
 func (d *DataWorker) retrieve(resp chan Response) {
 	go func() {
-		defer d.disconnect()
+		defer func() {
+			d.disconnect()
+			close(resp)
+			d.logger.Infof("Closing Data Connection")
+		}()
+
 		if d.transferReq == nil {
 			resp <- SyntaxError2
 			return
@@ -134,7 +139,11 @@ func (d *DataWorker) retrieve(resp chan Response) {
 
 func (d *DataWorker) store(resp chan Response) {
 	go func() {
-		defer d.disconnect()
+		defer func() {
+			d.disconnect()
+			close(resp)
+			d.logger.Infof("Closing Data Connection")
+		}()
 
 		conn := <-d.connection
 		if conn.err != nil {
@@ -175,6 +184,7 @@ func (d *DataWorker) delete() {
 
 func (d *DataWorker) createPasv() Response {
 	ready := make(chan error)
+	defer close(ready)
 	go func() {
 		var err error
 		d.server, err = net.Listen("tcp", ":2024")
@@ -201,6 +211,7 @@ func (d *DataWorker) createPasv() Response {
 
 func (d *DataWorker) createPort(req *Request) Response {
 	ready := make(chan error)
+	defer close(ready)
 	go func() {
 		var err error
 

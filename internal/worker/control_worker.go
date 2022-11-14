@@ -39,7 +39,9 @@ type ControlWorker struct {
 
 	Transfer
 
-	dataTransferResponse chan Response
+	quit                 chan struct{}
+	dataTransferResponse chan chan Response // indirection of channels helps with clean up resources in possible race during shutdown
+	connection           net.Conn
 
 	// keeps track of currently executing command, if that command is considered
 	// complex ~ pasv/port/retr/...etc, and forces as specific sequence of allowable
@@ -55,16 +57,19 @@ type ControlWorker struct {
 	}
 }
 
-func NewControlWorker(l logger.Client) *ControlWorker {
+func NewControlWorker(l logger.Client, conn net.Conn) *ControlWorker {
 	return &ControlWorker{
 		logger: l,
 		users: map[string]string{
 			"hkhan": "password",
 		},
-		pwd:         "/temp",
-		executing:   "NONE",
-		Transfer:    NewDefaultTransfer(),
-		IDataWorker: NewDataWorker(NewDefaultTransfer(), "/temp", l),
+		pwd:                  "/temp",
+		executing:            "NONE",
+		Transfer:             NewDefaultTransfer(),
+		IDataWorker:          NewDataWorker(NewDefaultTransfer(), "/temp", l),
+		connection:           conn,
+		quit:                 make(chan struct{}),
+		dataTransferResponse: make(chan chan Response),
 	}
 }
 
@@ -74,15 +79,15 @@ func NewControlWorker(l logger.Client) *ControlWorker {
 // much of the core logic that drives the control connection is
 // handled here such as errors, responses, and more complex workflows
 // such as the actual transfer of bytes across the data connection
-func (c *ControlWorker) Start(ctx context.Context, conn net.Conn) {
+func (c *ControlWorker) Start(ctx context.Context) {
 	defer func() {
-		c.logger.Infof("Closing Control Connection")
-		conn.Close()
+		c.quit <- struct{}{}
 	}()
+	go c.TransferResponse(ctx)
 
 	// reply to ftp client that we're ready to start processing requests
-	conn.Write(ServiceReady.Byte())
-	reader := bufio.NewReader(conn)
+	c.connection.Write(ServiceReady.Byte())
+	reader := bufio.NewReader(c.connection)
 	for {
 		buffer, err := reader.ReadBytes('\n')
 		if err != nil {
@@ -106,33 +111,52 @@ func (c *ControlWorker) Start(ctx context.Context, conn net.Conn) {
 			c.logger.Infof(fmt.Sprintf("Handler Error: %v", err))
 		}
 
-		switch conn.Write(resp.Byte()); resp {
+		switch c.connection.Write(resp.Byte()); resp {
 		case UserQuit:
-			c.IDataWorker.Stop()
 			return
 		case StartTransfer:
-			c.dataTransferResponse = make(chan Response)
-			go func() {
-				defer close(c.dataTransferResponse)
-				resp := <-c.dataTransferResponse
-				conn.Write(resp.Byte())
-				c.executing = None
-			}()
-			c.IDataWorker.Start(c.dataTransferResponse)
+			// create another channel, pass it to the dataTransferResponse Channel
+			// channel will be closed by sender, unbuffered is necesarry for unblocking
+			// sender
+			pipe := make(chan Response, 2)
+			c.dataTransferResponse <- pipe
+			c.IDataWorker.Start(pipe)
 		default:
 			// pass through to next cmd since no "special" processing is required
 		}
 	}
 }
 
-// There are two possible states in which Stop() can be called
-// 1. No transfer is happening, ControlWorker is in a 'None' processing state
-// 2. A transfer is happening, ControlWorker is in some State other than 'None'
-// we poll and check whether controlworker is finished executing its state before
-// closing the DataWorker.
-// main thing we need to figure out is how to coordinate a response back to the
-// ftp client and closing the socket, who shoould close the conn?
-func (c *ControlWorker) Stop(ctx context.Context) {
-	<-ctx.Done()
-	c.IDataWorker.Stop()
+func (c *ControlWorker) TransferResponse(ctx context.Context) {
+	defer func() {
+		c.IDataWorker.Stop()
+		c.connection.Close()
+		close(c.dataTransferResponse)
+		close(c.quit)
+		c.logger.Infof("Closing Control Connection")
+	}()
+	for {
+		select {
+		case <-ctx.Done():
+			if c.executing != None {
+				c.connection.Write(TransferAborted.Byte())
+			}
+			return
+		case pipe := <-c.dataTransferResponse:
+			select {
+			case <-ctx.Done():
+				if c.executing != None {
+					c.connection.Write(TransferAborted.Byte())
+				}
+				return
+			case resp := <-pipe:
+				c.connection.Write(resp.Byte())
+				c.executing = None
+			case <-c.quit:
+				return
+			}
+		case <-c.quit:
+			return
+		}
+	}
 }

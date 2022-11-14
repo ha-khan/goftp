@@ -2,6 +2,7 @@ package worker
 
 import (
 	"goftp/internal/logger"
+	"net"
 	"testing"
 )
 
@@ -71,7 +72,8 @@ func setUserLoggedIn(w *ControlWorker) {
 func TestDriver(t *testing.T) {
 	for _, testcase := range accessControlTestCases {
 		t.Run(testcase.TestName, func(t *testing.T) {
-			w := NewControlWorker(logger.NewStdStreamClient())
+			_, server := net.Pipe()
+			w := NewControlWorker(logger.NewStdStreamClient(), server)
 			testcase.MutationFunc(w)
 			handler, req, err := w.Parse(testcase.Command)
 			if err != nil {
