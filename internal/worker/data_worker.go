@@ -42,10 +42,6 @@ type DataWorker struct {
 
 func NewDataWorker(t Transfer, pwd string, logger logger.Client) *DataWorker {
 	return &DataWorker{
-		connection: make(chan struct {
-			socket net.Conn
-			err    error
-		}),
 		pwd:      pwd,
 		logger:   logger,
 		Transfer: t,
@@ -66,13 +62,8 @@ func (d *DataWorker) Start(resp chan Response) {
 }
 
 // disconnect any open connections and
-// close any open channels
-// DataWorker is considered halted for use
-// TODO: need to implement graceful close of pending transfers
-// they should complete
 func (d *DataWorker) Stop() {
 	d.disconnect()
-	close(d.connection)
 }
 
 func (d *DataWorker) Connect(req *Request) Response {
@@ -126,11 +117,14 @@ func (d *DataWorker) retrieve(resp chan Response) {
 		}
 
 		//-----------------------------------------------------------------------
-		// TODO: reading/sending of bytes is based off of transfer mode
+		// TODO: reading/sending of bytes is based off of transfer mode and handle errors
+		//
+		// Transfer.CreateWriter(fd) ~ abstract factory used to read/write based off of configuration for
+		// Transfer struct ... probably call it TransferWorker
 		scanner := bufio.NewScanner(fd)
 		sender := bufio.NewWriter(conn.socket)
 		for scanner.Scan() {
-			sender.Write(append(scanner.Bytes(), []byte("\n")...))
+			_, err = sender.Write(append(scanner.Bytes(), []byte("\n")...))
 			sender.Flush()
 		}
 		//-----------------------------------------------------------------------
@@ -189,9 +183,15 @@ func (d *DataWorker) delete() {
 
 func (d *DataWorker) createPasv() Response {
 	ready := make(chan error)
+	d.connection = make(chan struct {
+		socket net.Conn
+		err    error
+	})
 	defer close(ready)
 	go func() {
+		defer close(d.connection)
 		var err error
+
 		d.server, err = net.Listen("tcp", ":2024")
 		if ready <- err; err != nil {
 			return
@@ -216,8 +216,13 @@ func (d *DataWorker) createPasv() Response {
 
 func (d *DataWorker) createPort(req *Request) Response {
 	ready := make(chan error)
+	d.connection = make(chan struct {
+		socket net.Conn
+		err    error
+	})
 	defer close(ready)
 	go func() {
+		defer close(d.connection)
 		var err error
 
 		strs := strings.Split(req.Arg, ",")
