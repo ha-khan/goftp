@@ -87,9 +87,8 @@ func (c *ControlWorker) Start(ctx context.Context) {
 	go c.Responder(ctx)
 
 	// reply to ftp client that we're ready to start processing requests
-	c.connection.Write(ServiceReady.Byte())
-	reader := bufio.NewReader(c.connection)
-	for {
+	c.generalRespond <- ServiceReady
+	for reader := bufio.NewReader(c.connection); ; {
 		buffer, err := reader.ReadBytes('\n')
 		if err != nil {
 			c.logger.Infof(fmt.Sprintf("Connection Buffer Read Error: %v", err))
