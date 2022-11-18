@@ -39,9 +39,10 @@ type ControlWorker struct {
 
 	Transfer
 
-	quit                 chan struct{}
-	dataTransferResponse chan chan Response
-	connection           net.Conn
+	dtpRespond     chan chan Response
+	generalRespond chan Response
+
+	connection net.Conn
 
 	// keeps track of currently executing command, if that command is considered
 	// complex ~ pasv/port/retr/...etc, and forces as specific sequence of allowable
@@ -62,13 +63,13 @@ func NewControlWorker(l logger.Client, conn net.Conn) *ControlWorker {
 		users: map[string]string{
 			"hkhan": "password",
 		},
-		pwd:                  "/temp",
-		executing:            "NONE",
-		Transfer:             NewDefaultTransfer(),
-		IDataWorker:          NewDataWorker(NewDefaultTransfer(), "/temp", l),
-		connection:           conn,
-		quit:                 make(chan struct{}, 2),
-		dataTransferResponse: make(chan chan Response),
+		pwd:            "/temp",
+		executing:      "NONE",
+		Transfer:       NewDefaultTransfer(),
+		IDataWorker:    NewDataWorker(NewDefaultTransfer(), "/temp", l),
+		connection:     conn,
+		dtpRespond:     make(chan chan Response, 2),
+		generalRespond: make(chan Response, 2),
 	}
 }
 
@@ -80,11 +81,10 @@ func NewControlWorker(l logger.Client, conn net.Conn) *ControlWorker {
 // such as the actual transfer of bytes across the data connection
 func (c *ControlWorker) Start(ctx context.Context) {
 	defer func() {
-		c.quit <- struct{}{}
-		close(c.quit)
-		close(c.dataTransferResponse)
+		close(c.generalRespond)
+		close(c.dtpRespond)
 	}()
-	go c.TransferResponse(ctx)
+	go c.Responder(ctx)
 
 	// reply to ftp client that we're ready to start processing requests
 	c.connection.Write(ServiceReady.Byte())
@@ -112,12 +112,12 @@ func (c *ControlWorker) Start(ctx context.Context) {
 			c.logger.Infof(fmt.Sprintf("Handler Error: %v", err))
 		}
 
-		switch c.connection.Write(resp.Byte()); resp {
+		switch c.generalRespond <- resp; resp {
 		case UserQuit:
 			return
 		case StartTransfer:
 			pipe := make(chan Response, 2)
-			c.dataTransferResponse <- pipe
+			c.dtpRespond <- pipe
 			c.IDataWorker.Start(pipe)
 		default:
 			// pass through to next cmd since no "special" processing is required
@@ -125,7 +125,7 @@ func (c *ControlWorker) Start(ctx context.Context) {
 	}
 }
 
-func (c *ControlWorker) TransferResponse(ctx context.Context) {
+func (c *ControlWorker) Responder(ctx context.Context) {
 	defer func() {
 		c.IDataWorker.Stop()
 		c.connection.Close()
@@ -140,7 +140,12 @@ func (c *ControlWorker) TransferResponse(ctx context.Context) {
 				c.connection.Write(ServiceNotAvailable.Byte())
 			}
 			return
-		case pipe := <-c.dataTransferResponse:
+		case resp := <-c.generalRespond:
+			c.connection.Write(resp.Byte())
+			if resp == UserQuit {
+				return
+			}
+		case pipe := <-c.dtpRespond:
 			select {
 			case <-ctx.Done():
 				if c.executing != None {
@@ -150,11 +155,12 @@ func (c *ControlWorker) TransferResponse(ctx context.Context) {
 			case resp := <-pipe:
 				c.connection.Write(resp.Byte())
 				c.executing = None
-			case <-c.quit:
-				return
+			case resp := <-c.generalRespond:
+				c.connection.Write(resp.Byte())
+				if resp == UserQuit {
+					return
+				}
 			}
-		case <-c.quit:
-			return
 		}
 	}
 }
