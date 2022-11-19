@@ -86,7 +86,6 @@ func (c *ControlWorker) Receiver(ctx context.Context) {
 		close(c.dtpRespond)
 	}()
 
-	// reply to ftp client that we're ready to start processing requests
 	c.generalRespond <- ServiceReady
 	for reader := bufio.NewReader(c.connection); ; {
 		buffer, err := reader.ReadBytes('\n')
