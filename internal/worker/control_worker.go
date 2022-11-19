@@ -80,12 +80,11 @@ func NewControlWorker(l logger.Client, conn net.Conn) *ControlWorker {
 // much of the core logic that drives the control connection is
 // handled here such as errors, responses, and more complex workflows
 // such as the actual transfer of bytes across the data connection
-func (c *ControlWorker) Start(ctx context.Context) {
+func (c *ControlWorker) Receiver(ctx context.Context) {
 	defer func() {
 		close(c.generalRespond)
 		close(c.dtpRespond)
 	}()
-	go c.Responder(ctx)
 
 	// reply to ftp client that we're ready to start processing requests
 	c.generalRespond <- ServiceReady
@@ -93,6 +92,7 @@ func (c *ControlWorker) Start(ctx context.Context) {
 		buffer, err := reader.ReadBytes('\n')
 		if err != nil {
 			c.logger.Infof(fmt.Sprintf("Connection Buffer Read Error: %v", err))
+			c.generalRespond <- ForcedShutDown
 			return
 		}
 
@@ -141,6 +141,10 @@ func (c *ControlWorker) Responder(ctx context.Context) {
 			}
 			return
 		case resp := <-c.generalRespond:
+			if resp == ForcedShutDown {
+				c.logger.Infof("Received Forced Shutdown")
+				return
+			}
 			c.connection.Write(resp.Byte())
 			if resp == UserQuit {
 				return
@@ -156,6 +160,10 @@ func (c *ControlWorker) Responder(ctx context.Context) {
 				c.connection.Write(resp.Byte())
 				c.IExecutingState.SetCMD(None)
 			case resp := <-c.generalRespond:
+				if resp == ForcedShutDown {
+					c.logger.Infof("Received Forced Shutdown")
+					return
+				}
 				c.connection.Write(resp.Byte())
 				if resp == UserQuit {
 					return

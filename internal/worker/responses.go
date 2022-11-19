@@ -10,6 +10,12 @@ const (
 	CRLF Response = "\r\n"
 )
 
+// custom, will not be sent back to ftp client used to control
+// shutdown in case of EOF or other control connection read issues
+const (
+	ForcedShutDown Response = "Control Connection Read Issue"
+)
+
 // 100s
 const (
 	StartTransfer      Response = "125 Data connection already open; transfer starting"
