@@ -1,5 +1,7 @@
 package worker
 
+import "sync"
+
 type CMD string
 
 const (
@@ -48,6 +50,23 @@ var table = map[CMD]map[CMD]any{
 	},
 }
 
+type ExecutingState struct {
+	// current executing state
+	cmd CMD
+
+	stateTable map[CMD]map[CMD]any
+
+	mutex sync.Locker
+}
+
+func NewExecutingState() *ExecutingState {
+	return &ExecutingState{
+		cmd:        None,
+		stateTable: table,
+		mutex:      new(sync.Mutex),
+	}
+}
+
 // check whether the given request + current state will allow for handler to
 // be invoked
 //
@@ -56,8 +75,22 @@ var table = map[CMD]map[CMD]any{
 // eventually return the worker to an "idle" state.
 //
 // configuration and other lcm commands are however still accepted,
-func (c *ControlWorker) RejectCMD(requested *Request) bool {
-	_, reject := table[c.executing][CMD(requested.Cmd)]
+func (e *ExecutingState) CheckCMD(requested *Request) bool {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+	_, reject := table[e.cmd][CMD(requested.Cmd)]
 
 	return reject
+}
+
+func (e *ExecutingState) SetCMD(cmd CMD) {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+	e.cmd = cmd
+}
+
+func (e *ExecutingState) GetCMD() CMD {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+	return e.cmd
 }

@@ -44,10 +44,11 @@ type ControlWorker struct {
 
 	connection net.Conn
 
-	// keeps track of currently executing command, if that command is considered
-	// complex ~ pasv/port/retr/...etc, and forces as specific sequence of allowable
-	// commands to be called if set to a value other than 'None'
-	executing CMD
+	IExecutingState interface {
+		CheckCMD(requested *Request) bool
+		SetCMD(cmd CMD)
+		GetCMD() CMD
+	}
 
 	IDataWorker interface {
 		Start(chan Response)
@@ -63,13 +64,13 @@ func NewControlWorker(l logger.Client, conn net.Conn) *ControlWorker {
 		users: map[string]string{
 			"hkhan": "password",
 		},
-		pwd:            "/temp",
-		executing:      "NONE",
-		Transfer:       NewDefaultTransfer(),
-		IDataWorker:    NewDataWorker(NewDefaultTransfer(), "/temp", l),
-		connection:     conn,
-		dtpRespond:     make(chan chan Response, 2),
-		generalRespond: make(chan Response, 2),
+		pwd:             "/temp",
+		IExecutingState: NewExecutingState(),
+		Transfer:        NewDefaultTransfer(),
+		IDataWorker:     NewDataWorker(NewDefaultTransfer(), "/temp", l),
+		connection:      conn,
+		dtpRespond:      make(chan chan Response, 2),
+		generalRespond:  make(chan Response, 2),
 	}
 }
 
@@ -100,7 +101,7 @@ func (c *ControlWorker) Start(ctx context.Context) {
 			c.logger.Infof(fmt.Sprintf("Parsing Error: %v", err))
 		}
 
-		if reject := c.RejectCMD(req); reject {
+		if reject := c.IExecutingState.CheckCMD(req); reject {
 			handler = func(r *Request) (Response, error) {
 				return BadSequence, nil
 			}
@@ -133,7 +134,7 @@ func (c *ControlWorker) Responder(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			if c.executing != None {
+			if c.IExecutingState.GetCMD() != None {
 				c.connection.Write(TransferAborted.Byte())
 			} else {
 				c.connection.Write(ServiceNotAvailable.Byte())
@@ -147,13 +148,13 @@ func (c *ControlWorker) Responder(ctx context.Context) {
 		case pipe := <-c.dtpRespond:
 			select {
 			case <-ctx.Done():
-				if c.executing != None {
+				if c.IExecutingState.GetCMD() != None {
 					c.connection.Write(TransferAborted.Byte())
 				}
 				return
 			case resp := <-pipe:
 				c.connection.Write(resp.Byte())
-				c.executing = None
+				c.IExecutingState.SetCMD(None)
 			case resp := <-c.generalRespond:
 				c.connection.Write(resp.Byte())
 				if resp == UserQuit {
