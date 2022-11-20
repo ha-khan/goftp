@@ -39,6 +39,7 @@ func (d *Dispatcher) Start() {
 	var err error
 	d.server, err = net.Listen("tcp", ":2023")
 	if err != nil {
+		// TODO: make this a log fatalf
 		panic(err.Error())
 	}
 
@@ -59,7 +60,7 @@ func (d *Dispatcher) Start() {
 		worker := worker.NewControlWorker(d.logger, conn)
 		d.wg.Add(2)
 		go func() {
-			worker.Receiver(ctx)
+			worker.Receiver()
 			d.wg.Done()
 		}()
 		go func() {

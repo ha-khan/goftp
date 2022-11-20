@@ -1,9 +1,9 @@
 package worker
 
 import (
-	"bufio"
 	"fmt"
 	"goftp/internal/logger"
+	"io"
 	"net"
 	"os"
 	"strconv"
@@ -116,18 +116,11 @@ func (d *DataWorker) retrieve(resp chan Response) {
 			return
 		}
 
-		//-----------------------------------------------------------------------
-		// TODO: reading/sending of bytes is based off of transfer mode and handle errors
-		//
-		// Transfer.CreateWriter(fd) ~ abstract factory used to read/write based off of configuration for
-		// Transfer struct ... probably call it TransferWorker
-		scanner := bufio.NewScanner(fd)
-		sender := bufio.NewWriter(conn.socket)
-		for scanner.Scan() {
-			_, err = sender.Write(append(scanner.Bytes(), []byte("\n")...))
-			sender.Flush()
+		_, err = io.Copy(conn.socket, fd)
+		if err != nil {
+			resp <- TransferAborted
+			return
 		}
-		//-----------------------------------------------------------------------
 
 		resp <- TransferComplete
 	}()
@@ -154,18 +147,11 @@ func (d *DataWorker) store(resp chan Response) {
 		}
 		defer fd.Close()
 
-		diskWriter := bufio.NewWriter(fd)
-
-		//-----------------------------------------------------------------------
-		// TODO: reading/sending of bytes is based off of transfer mode
-		// read text into memory and then write to disk
-		// FIXME: no way to know if ascii from client has new line at end
-		for scanner := bufio.NewScanner(conn.socket); scanner.Scan(); {
-			text := scanner.Text()
-			diskWriter.WriteString(text + "\n")
-			diskWriter.Flush()
+		_, err = io.Copy(fd, conn.socket)
+		if err != nil {
+			resp <- TransferAborted
+			return
 		}
-		//-----------------------------------------------------------------------
 
 		resp <- TransferComplete
 	}()
@@ -197,6 +183,7 @@ func (d *DataWorker) createPasv() Response {
 			return
 		}
 
+		// TODO: add timeout here
 		d.conn, err = d.server.Accept()
 		d.connection <- struct {
 			socket net.Conn
@@ -245,6 +232,7 @@ func (d *DataWorker) createPort(req *Request) Response {
 			return
 		}
 
+		// TODO: add timeout here
 		ready <- nil
 		d.connection <- struct {
 			socket net.Conn

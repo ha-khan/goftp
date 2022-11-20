@@ -12,7 +12,7 @@ func Test_Start_And_Quit(t *testing.T) {
 	client, server := net.Pipe()
 	worker := NewControlWorker(logger.NewStdStreamClient(), server)
 
-	go worker.Receiver(context.TODO())
+	go worker.Receiver()
 	go worker.Responder(context.TODO())
 
 	scanner := bufio.NewScanner(client)
@@ -41,7 +41,7 @@ func Test_Start_And_OS_Shutdown(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go worker.Receiver(ctx)
+	go worker.Receiver()
 	go worker.Responder(ctx)
 
 	scanner := bufio.NewScanner(client)
@@ -63,7 +63,7 @@ func Test_User_Login(t *testing.T) {
 	client, server := net.Pipe()
 	worker := NewControlWorker(logger.NewStdStreamClient(), server)
 
-	go worker.Receiver(context.TODO())
+	go worker.Receiver()
 	go worker.Responder(context.TODO())
 
 	scanner := bufio.NewScanner(client)

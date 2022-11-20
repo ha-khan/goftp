@@ -3,6 +3,7 @@ package worker
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"goftp/internal/logger"
 	"net"
@@ -45,8 +46,8 @@ type ControlWorker struct {
 	connection net.Conn
 
 	IExecutingState interface {
-		CheckCMD(requested *Request) bool
-		SetCMD(cmd CMD)
+		CheckCMD(*Request) bool
+		SetCMD(CMD)
 		GetCMD() CMD
 	}
 
@@ -80,7 +81,7 @@ func NewControlWorker(l logger.Client, conn net.Conn) *ControlWorker {
 // much of the core logic that drives the control connection is
 // handled here such as errors, responses, and more complex workflows
 // such as the actual transfer of bytes across the data connection
-func (c *ControlWorker) Receiver(ctx context.Context) {
+func (c *ControlWorker) Receiver() {
 	defer func() {
 		close(c.generalRespond)
 		close(c.dtpRespond)
@@ -90,14 +91,17 @@ func (c *ControlWorker) Receiver(ctx context.Context) {
 	for reader := bufio.NewReader(c.connection); ; {
 		buffer, err := reader.ReadBytes('\n')
 		if err != nil {
-			c.logger.Infof(fmt.Sprintf("Connection Buffer Read Error: %v", err))
+			if !errors.Is(err, net.ErrClosed) {
+				c.logger.Infof(fmt.Sprintf("Receiver: read error: %v", err))
+			}
+
 			c.generalRespond <- ForcedShutDown
 			return
 		}
 
 		handler, req, err := c.Parse(string(buffer))
 		if err != nil {
-			c.logger.Infof(fmt.Sprintf("Parsing Error: %v", err))
+			c.logger.Infof(fmt.Sprintf("Receiver: parsing error: %v", err))
 		}
 
 		if reject := c.IExecutingState.CheckCMD(req); reject {
@@ -108,7 +112,7 @@ func (c *ControlWorker) Receiver(ctx context.Context) {
 
 		resp, err := handler(req)
 		if err != nil {
-			c.logger.Infof(fmt.Sprintf("Handler Error: %v", err))
+			c.logger.Infof(fmt.Sprintf("Receiver: handler error: %v", err))
 		}
 
 		switch c.generalRespond <- resp; resp {
@@ -128,7 +132,7 @@ func (c *ControlWorker) Responder(ctx context.Context) {
 	defer func() {
 		c.IDataWorker.Stop()
 		c.connection.Close()
-		c.logger.Infof("Closing Control Connection")
+		c.logger.Infof("Responder: closing control connection")
 	}()
 	for {
 		select {
@@ -141,7 +145,7 @@ func (c *ControlWorker) Responder(ctx context.Context) {
 			return
 		case resp := <-c.generalRespond:
 			if resp == ForcedShutDown {
-				c.logger.Infof("Received Forced Shutdown")
+				c.logger.Infof("Responder: forcing shutdown")
 				return
 			}
 			c.connection.Write(resp.Byte())
