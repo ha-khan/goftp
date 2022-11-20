@@ -11,15 +11,11 @@ import (
 	"time"
 )
 
+// Dispatcher ...
 type Dispatcher struct {
-	logger logger.Client
-	server net.Listener
-
-	// control connection port
-	// usually 21
-	port string
-
-	// TODO: store connection pool for PASV
+	logger   logger.Client
+	server   net.Listener
+	port     string
 	shutdown context.CancelFunc
 	wg       *sync.WaitGroup
 }

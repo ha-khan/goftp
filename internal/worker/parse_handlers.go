@@ -52,15 +52,13 @@ func (c *ControlWorker) Parse(request string) (Handler, *Request, error) {
 		handler = c.handleStore
 	case "RETR":
 		handler = c.handleRetrieve
-	case "DELE":
-		handler = c.handleDelete
 	case "NOOP":
 		handler = c.handleNoop
 	case "QUIT":
 		return c.handleQuit, req, nil
 	case "LIST", "ACCT", "CWD", "CDUP", "SMNT", "REIN", "HELP",
 		"STRU", "STOU", "APPE", "ALLO", "REST", "RNFR", "RNTO",
-		"ABOR", "RMD", "MKD", "NLST", "SITE", "SYST", "STAT":
+		"ABOR", "RMD", "MKD", "NLST", "SITE", "SYST", "STAT", "DELE":
 		handler = c.handleCmdNotImplemented
 	default:
 		return c.handleSyntaxErrorInvalidCmd, req, fmt.Errorf("Invalid CMD: %s", req.Cmd)

@@ -30,21 +30,20 @@ type DataWorker struct {
 	host string
 	port uint16
 
-	pwd string
-	Transfer
 	pasv bool
 
 	// data worker is configured to work with s specific
 	// transfer request ~ Store, Retrieve, List, ... etc
 	transferReq  *Request
 	transferType string
+
+	*TransferFactory
 }
 
-func NewDataWorker(t Transfer, pwd string, logger logger.Client) *DataWorker {
+func NewDataWorker(logger logger.Client) *DataWorker {
 	return &DataWorker{
-		pwd:      pwd,
-		logger:   logger,
-		Transfer: t,
+		logger:          logger,
+		TransferFactory: NewDefaultTransferFactory(),
 	}
 }
 
@@ -103,7 +102,7 @@ func (d *DataWorker) retrieve(resp chan Response) {
 			return
 		}
 
-		fd, err := os.Open("./" + d.pwd + "/" + d.transferReq.Arg)
+		fd, err := os.Open("./" + d.GetPWD() + "/" + d.transferReq.Arg)
 		if err != nil {
 			resp <- FileNotFound
 			return
@@ -140,7 +139,7 @@ func (d *DataWorker) store(resp chan Response) {
 			return
 		}
 
-		fd, err := os.Create("." + d.pwd + "/" + d.transferReq.Arg)
+		fd, err := os.Create("." + d.GetPWD() + "/" + d.transferReq.Arg)
 		if err != nil {
 			resp <- FileNotFound
 			return
@@ -157,15 +156,9 @@ func (d *DataWorker) store(resp chan Response) {
 	}()
 }
 
-func (d *DataWorker) list() {
+func (d *DataWorker) list() {}
 
-}
-
-func (d *DataWorker) delete() {
-	// TODO: need to lock file if its being used for read/store
-	//
-	//	delete shouldn't impact that
-}
+func (d *DataWorker) delete() {}
 
 func (d *DataWorker) createPasv() Response {
 	ready := make(chan error)

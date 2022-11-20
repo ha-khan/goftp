@@ -4,41 +4,12 @@ import (
 	"fmt"
 )
 
-type Handler func(*Request) (Response, error)
-
 func (c ControlWorker) handlePWD(req *Request) (Response, error) {
-	return Response(fmt.Sprintf(string(DirectoryResponse), c.pwd)), nil
+	return Response(fmt.Sprintf(string(DirectoryResponse), c.ITransferFactory.GetPWD())), nil
 }
 
 func (c ControlWorker) handleNoop(req *Request) (Response, error) {
 	return CommandOK, nil
-}
-
-// Transfer Parameters, only accepting a subset from spec
-type Transfer struct {
-	// MODE command specifies how the bits of the data are to be transmitted
-	// S - Stream
-	Mode rune
-	//
-	//
-	// STRUcture and TYPE commands, are used to define the way in which the data are to be represented.
-	//
-	// F - File (no structure, file is considered to be a sequence of data bytes)
-	// R - Record (must be accepted for "text" files (ASCII) )
-	Structure rune
-	//
-	//
-	// A - ASCII (primarily for the transfer of text files <CRLF> used to denote end of text line)
-	// I - Image (data is sent as contiguous bits, which  are packed into 8-bit transfer bytes)
-	Type rune
-}
-
-func NewDefaultTransfer() Transfer {
-	return Transfer{
-		Mode:      'S', // Stream
-		Structure: 'F', // File
-		Type:      'A', // ASCII
-	}
 }
 
 /*
@@ -79,7 +50,7 @@ func (c *ControlWorker) handleType(req *Request) (Response, error) {
 		return CmdNotImplementedForParam, nil
 	}
 
-	c.Type = symbol
+	c.ITransferFactory.SetType(symbol)
 	return CommandOK, nil
 }
 
@@ -108,7 +79,7 @@ func (c *ControlWorker) handleMode(req *Request) (Response, error) {
 		return CmdNotImplementedForParam, nil
 	}
 
-	c.Mode = symbol
+	c.ITransferFactory.SetMode(symbol)
 	return CommandOK, nil
 }
 
@@ -137,11 +108,11 @@ func (c *ControlWorker) handleStrucure(req *Request) (Response, error) {
 		return CmdNotImplementedForParam, nil
 	}
 
-	if symbol == 'R' && c.Type != 'A' {
+	if symbol == 'R' && c.ITransferFactory.GetType() != 'A' {
 		return CmdNotImplementedForParam, nil
 	}
 
-	c.Structure = symbol
+	c.ITransferFactory.SetStructure(symbol)
 	return CommandOK, nil
 }
 

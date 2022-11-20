@@ -9,6 +9,8 @@ import (
 	"net"
 )
 
+type Handler func(*Request) (Response, error)
+
 // ControlWorker handles the entire lifecycle management of each control connection
 // initiated against the ftp server
 //
@@ -33,13 +35,6 @@ type ControlWorker struct {
 	currentUser string
 	loggedIn    bool
 
-	// present working directory, clients are unable to
-	// move outside of pwd, which is considered the
-	// "root" directory set at initialization time
-	pwd string
-
-	Transfer
-
 	dtpRespond     chan chan Response
 	generalRespond chan Response
 
@@ -57,21 +52,30 @@ type ControlWorker struct {
 		SetTransferRequest(*Request)
 		Connect(*Request) Response
 	}
+
+	ITransferFactory interface {
+		SetPWD(string)
+		GetPWD() string
+		SetStructure(rune)
+		SetMode(rune)
+		SetType(rune)
+		GetType() rune
+	}
 }
 
 func NewControlWorker(l logger.Client, conn net.Conn) *ControlWorker {
+	dw := NewDataWorker(l)
 	return &ControlWorker{
 		logger: l,
 		users: map[string]string{
 			"hkhan": "password",
 		},
-		pwd:             "/temp",
-		IExecutingState: NewExecutingState(),
-		Transfer:        NewDefaultTransfer(),
-		IDataWorker:     NewDataWorker(NewDefaultTransfer(), "/temp", l),
-		connection:      conn,
-		dtpRespond:      make(chan chan Response, 2),
-		generalRespond:  make(chan Response, 2),
+		IExecutingState:  NewExecutingState(),
+		IDataWorker:      dw,
+		ITransferFactory: dw,
+		connection:       conn,
+		dtpRespond:       make(chan chan Response, 2),
+		generalRespond:   make(chan Response, 2),
 	}
 }
 
@@ -134,6 +138,7 @@ func (c *ControlWorker) Responder(ctx context.Context) {
 		c.connection.Close()
 		c.logger.Infof("Responder: closing control connection")
 	}()
+
 	for {
 		select {
 		case <-ctx.Done():
