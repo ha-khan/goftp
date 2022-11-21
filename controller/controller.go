@@ -9,15 +9,12 @@ import (
 var once sync.Once
 var goFtp *GoFTP
 
-// GoFTP is the singleton instance of this
+// GoFTP is singleton instance of "this" FTP Server
 type GoFTP struct {
 	logger     logger.Client
 	dispatcher *dispatcher.Dispatcher
-	// TODO: eventually add a DataConnectionManager here
-	// which allows us to reuse open Ports
 }
 
-// BasicGoFTP returns a basic GOFTP instance
 func BasicGoFTP() *GoFTP {
 	once.Do(func() {
 		logger := logger.NewStdStreamClient()
@@ -36,7 +33,7 @@ func (g *GoFTP) Start() {
 	go g.dispatcher.Start()
 }
 
-// Stop stops all the internal components that
+// Stop will shutdown the service
 func (g *GoFTP) Stop() {
 	g.logger.Infof("Shutting down GoFTP...")
 	g.dispatcher.Stop()

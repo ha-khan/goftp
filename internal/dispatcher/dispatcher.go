@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// Dispatcher ...
+// Dispatcher will handle all control connections initiated against the FTP Server
 type Dispatcher struct {
 	logger   logger.Client
 	server   net.Listener
@@ -20,7 +20,6 @@ type Dispatcher struct {
 	wg       *sync.WaitGroup
 }
 
-// TODO: make more configurable such as ssh TCP server
 func New(log logger.Client) *Dispatcher {
 	return &Dispatcher{
 		logger: log,
@@ -28,15 +27,15 @@ func New(log logger.Client) *Dispatcher {
 	}
 }
 
-// Start kicks off the reactor loop for each control connections initiated by some ftp client
+// Start kicks off the reactor loop that handles each control connections initiated by some ftp client
+// a new ControlWorker instance will handle the LCM of that connection
 func (d *Dispatcher) Start() {
 	d.logger.Infof("Dispatcher starting up...")
 
 	var err error
 	d.server, err = net.Listen("tcp", ":2023")
 	if err != nil {
-		// TODO: make this a log fatalf
-		panic(err.Error())
+		panic(err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -66,6 +65,11 @@ func (d *Dispatcher) Start() {
 	}
 }
 
+// Stop Dispatcher thread from accepting new connections and invoke
+// shutdown ctx for each subsequent worker, forces a shutdown rather than
+// waiting until some transfer has completed as its a non-deterministic operation
+//
+// there can be future enhancements to wait for a transfer to complete in a given timeout
 func (d *Dispatcher) Stop() {
 	d.logger.Infof("Dispatcher shutting down...")
 	d.server.Close()
@@ -77,12 +81,12 @@ func (d *Dispatcher) Stop() {
 		done <- struct{}{}
 	}()
 
-	timeout := time.Tick(1 * time.Minute)
+	timeout := time.Tick(5 * time.Minute)
 	select {
 	case <-timeout:
 		d.logger.Infof("Timeout received for shutdown, exiting")
 	case <-done:
-		d.logger.Infof("Graceful shutdown done, exiting")
+		d.logger.Infof("Shutdown done, exiting")
 	}
 	d.logger.Infof("Dispatcher shutdown complete")
 }

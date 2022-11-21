@@ -9,6 +9,9 @@ import (
 	"net"
 )
 
+// Each FTP request will have a corresponding handler
+// paradigm is similar to how a HTTP Server would handle
+// a specific HTTP Request
 type Handler func(*Request) (Response, error)
 
 // ControlWorker handles the entire lifecycle management of each control connection
@@ -17,16 +20,8 @@ type Handler func(*Request) (Response, error)
 // ftp is stateful protocol, which means that a given request is handled
 // based off of how the previous requests were handled
 //
-// each worker will be modeled after a finite-state machine, primarily for requests/events
+// each ControlWorker will be modeled after a finite-state machine, primarily for requests/events
 // that require a specific sequence (PASV, STOR, ..etc)
-//
-// those previous requests set specific state information
-// (loggedIn, pwd, mo, stru, ty, currentOp), this tuple will be used to accept/reject a
-// given Request, but checking a TransitionTable
-//
-// in RFC 959 terms, this worker would be known as the Server-PI,
-// ftp is a request/response protocol and each read (request) will have its write (response)
-// execution of the handler is done
 type ControlWorker struct {
 	logger logger.Client
 
@@ -35,17 +30,28 @@ type ControlWorker struct {
 	currentUser string
 	loggedIn    bool
 
+	// channels used to send responses back to the FTP Client
+	// across the Control Connection
+	// buffered channels are used mainly to avoid blocking on
+	// shutdown scenarios
 	dtpRespond     chan chan Response
 	generalRespond chan Response
 
+	// connection with FTP Client (Control Connection)
 	connection net.Conn
 
+	// ControlWorkers can be put into a state that forces a subsequent
+	// command to match a specific one, mainly for data transfers
+	// also protects against malicious FTP Clients
 	IExecutingState interface {
 		CheckCMD(*Request) bool
 		SetCMD(CMD)
 		GetCMD() CMD
 	}
 
+	// There is a 1-to-1 relation with a DataWorker which handles all
+	// the data transfer interactions, the ControlWorker signals to the
+	// DataWorker when/what transfer should be done
 	IDataWorker interface {
 		Start(chan Response)
 		Stop()
@@ -53,6 +59,9 @@ type ControlWorker struct {
 		Connect(*Request) Response
 	}
 
+	// Data transfers can be configured and requires some "Factory" like
+	// object to construct the appropriate Reader/Writer, depending on the
+	// configurations set
 	ITransferFactory interface {
 		SetPWD(string)
 		GetPWD() string
@@ -79,7 +88,7 @@ func NewControlWorker(l logger.Client, conn net.Conn) *ControlWorker {
 	}
 }
 
-// Start will kick off the this workers processing
+// Receiver will kick off the this workers processing
 // of the client initiated control connection
 //
 // much of the core logic that drives the control connection is
@@ -132,6 +141,9 @@ func (c *ControlWorker) Receiver() {
 	}
 }
 
+// Responder multiplexes multiple channels and sends back responses to the FTP Client
+// and will also do extra processing for special Responses as well as initiate a shutdown
+// if the app is shutting down
 func (c *ControlWorker) Responder(ctx context.Context) {
 	defer func() {
 		c.IDataWorker.Stop()

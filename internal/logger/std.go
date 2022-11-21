@@ -19,14 +19,13 @@ func NewStdStreamClient() *stdStreamClient {
 	return stdClient
 }
 
-// client provides methods for package level logger logrus
 // writes to standard streams ~ stdout, stderr
 type stdStreamClient struct {
 	*log.Logger
 }
 
 func (s *stdStreamClient) SetLevel() {
-	s.Infof("Setting level to ")
+	s.Infof("Setting level to ...")
 }
 
 // Infof ...
