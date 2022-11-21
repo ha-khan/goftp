@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type DataWorker struct {
@@ -15,7 +16,7 @@ type DataWorker struct {
 	// to close them when needed
 	server net.Listener
 	conn   net.Conn
-
+	//
 	// channel used to communicate with subsequent go routine
 	// spawned to handler ~ Store, Retrieve, List, ... etc
 	//
@@ -102,6 +103,7 @@ func (d *DataWorker) retrieve(resp chan Response) {
 			return
 		}
 
+		// TODO: eventually use TransferFactory.Create(..)
 		fd, err := os.Open("./" + d.GetPWD() + "/" + d.transferReq.Arg)
 		if err != nil {
 			resp <- FileNotFound
@@ -111,6 +113,11 @@ func (d *DataWorker) retrieve(resp chan Response) {
 
 		conn := <-d.connection
 		if conn.err != nil {
+			resp <- CannotOpenDataConnection
+			return
+		}
+
+		if conn.socket == nil {
 			resp <- CannotOpenDataConnection
 			return
 		}
@@ -139,6 +146,12 @@ func (d *DataWorker) store(resp chan Response) {
 			return
 		}
 
+		if conn.socket == nil {
+			resp <- CannotOpenDataConnection
+			return
+		}
+
+		// TODO: eventually use TransferFactory.Create(..)
 		fd, err := os.Create("." + d.GetPWD() + "/" + d.transferReq.Arg)
 		if err != nil {
 			resp <- FileNotFound
@@ -172,18 +185,35 @@ func (d *DataWorker) createPasv() Response {
 		var err error
 
 		d.server, err = net.Listen("tcp", ":2024")
-		if ready <- err; err != nil {
+		if err != nil {
+			ready <- err
 			return
 		}
 
-		// TODO: add timeout here
+		err = d.server.(*net.TCPListener).SetDeadline(time.Now().Add(3 * time.Minute))
+		if err != nil {
+			ready <- err
+			return
+		}
+
+		// setup successful,
+		ready <- nil
+
 		d.conn, err = d.server.Accept()
-		d.connection <- struct {
+		timeout := make(chan struct{})
+		defer close(timeout)
+		go func() { time.Sleep(3 * time.Minute); <-timeout }()
+		select {
+		case d.connection <- struct {
 			socket net.Conn
 			err    error
-		}{
-			d.conn,
-			err,
+		}{d.conn, nil}:
+		case timeout <- struct{}{}:
+			d.logger.Infof("Timout waiting for data connection to be used, shutting down")
+			if d.conn != nil {
+				d.conn.Close()
+			}
+			d.server.Close()
 		}
 	}()
 
@@ -225,14 +255,19 @@ func (d *DataWorker) createPort(req *Request) Response {
 			return
 		}
 
-		// TODO: add timeout here
 		ready <- nil
-		d.connection <- struct {
+
+		timeout := make(chan struct{})
+		defer close(timeout)
+		go func() { time.Sleep(3 * time.Minute); <-timeout }()
+		select {
+		case d.connection <- struct {
 			socket net.Conn
 			err    error
-		}{
-			d.conn,
-			err,
+		}{d.conn, nil}:
+		case timeout <- struct{}{}:
+			d.logger.Infof("Timout waiting for data connection to be used, shutting down")
+			d.conn.Close()
 		}
 	}()
 
