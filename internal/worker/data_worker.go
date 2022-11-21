@@ -55,9 +55,9 @@ func (d *DataWorker) SetTransferRequest(req *Request) {
 
 func (d *DataWorker) Start(resp chan Response) {
 	if d.transferType == "RETR" {
-		d.retrieve(resp)
+		d.Pipe(resp, os.Open)
 	} else if d.transferType == "STOR" {
-		d.store(resp)
+		d.Pipe(resp, os.Create)
 	}
 }
 
@@ -90,7 +90,7 @@ func (d *DataWorker) disconnect() {
 	}
 }
 
-func (d *DataWorker) retrieve(resp chan Response) {
+func (d *DataWorker) Pipe(resp chan Response, file func(string) (*os.File, error)) {
 	go func() {
 		defer func() {
 			d.disconnect()
@@ -104,7 +104,7 @@ func (d *DataWorker) retrieve(resp chan Response) {
 		}
 
 		// TODO: eventually use TransferFactory.Create(..)
-		fd, err := os.Open("./" + d.GetPWD() + "/" + d.transferReq.Arg)
+		fd, err := file("./" + d.GetPWD() + "/" + d.transferReq.Arg)
 		if err != nil {
 			resp <- FileNotFound
 			return
@@ -122,44 +122,15 @@ func (d *DataWorker) retrieve(resp chan Response) {
 			return
 		}
 
-		_, err = io.Copy(conn.socket, fd)
-		if err != nil {
-			resp <- TransferAborted
-			return
+		var dst io.Writer
+		var src io.Reader
+		if d.transferReq.Cmd == "STOR" {
+			dst, src = fd, conn.socket
+		} else {
+			dst, src = conn.socket, fd
 		}
 
-		resp <- TransferComplete
-	}()
-}
-
-func (d *DataWorker) store(resp chan Response) {
-	go func() {
-		defer func() {
-			d.disconnect()
-			close(resp)
-			d.logger.Infof("Closing Data Connection")
-		}()
-
-		conn := <-d.connection
-		if conn.err != nil {
-			resp <- CannotOpenDataConnection
-			return
-		}
-
-		if conn.socket == nil {
-			resp <- CannotOpenDataConnection
-			return
-		}
-
-		// TODO: eventually use TransferFactory.Create(..)
-		fd, err := os.Create("." + d.GetPWD() + "/" + d.transferReq.Arg)
-		if err != nil {
-			resp <- FileNotFound
-			return
-		}
-		defer fd.Close()
-
-		_, err = io.Copy(fd, conn.socket)
+		_, err = io.Copy(dst, src)
 		if err != nil {
 			resp <- TransferAborted
 			return
