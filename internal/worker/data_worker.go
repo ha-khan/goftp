@@ -178,13 +178,10 @@ func (d *DataWorker) createPasv() Response {
 		case d.connection <- struct {
 			socket net.Conn
 			err    error
-		}{d.conn, nil}:
+		}{d.conn, err}:
 		case timeout <- struct{}{}:
 			d.logger.Infof("Timout waiting for data connection to be used, shutting down")
-			if d.conn != nil {
-				d.conn.Close()
-			}
-			d.server.Close()
+			d.disconnect()
 		}
 	}()
 
@@ -238,7 +235,7 @@ func (d *DataWorker) createPort(req *Request) Response {
 		}{d.conn, nil}:
 		case timeout <- struct{}{}:
 			d.logger.Infof("Timout waiting for data connection to be used, shutting down")
-			d.conn.Close()
+			d.disconnect()
 		}
 	}()
 
