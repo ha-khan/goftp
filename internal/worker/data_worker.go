@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"goftp/internal/logger"
 	"io"
+	"math/rand"
 	"net"
 	"os"
 	"strconv"
@@ -70,10 +71,10 @@ func (d *DataWorker) Connect(req *Request) Response {
 	var response Response
 	if req.Cmd == "PASV" {
 		d.pasv = true
-		response = d.createPasv()
+		response = d.passive()
 	} else {
 		d.pasv = false
-		response = d.createPort(req)
+		response = d.active(req)
 	}
 
 	return response
@@ -144,33 +145,38 @@ func (d *DataWorker) list() {}
 
 func (d *DataWorker) delete() {}
 
-func (d *DataWorker) createPasv() Response {
-	ready := make(chan error)
+func (d *DataWorker) passive() Response {
+	var err error
+	var counter uint
+retry:
+	port := uint16(rand.Uint32())
+	d.server, err = net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		counter++
+		if counter > 5 {
+			return CannotOpenDataConnection
+		}
+
+		goto retry
+	}
+
+	err = d.server.(*net.TCPListener).SetDeadline(time.Now().Add(3 * time.Minute))
+	if err != nil {
+		return CannotOpenDataConnection
+	}
+
 	d.connection = make(chan struct {
 		socket net.Conn
 		err    error
 	})
-	defer close(ready)
+	ready := make(chan struct{})
 	go func() {
 		defer close(d.connection)
 		var err error
 
-		d.server, err = net.Listen("tcp", ":2024")
-		if err != nil {
-			ready <- err
-			return
-		}
-
-		err = d.server.(*net.TCPListener).SetDeadline(time.Now().Add(3 * time.Minute))
-		if err != nil {
-			ready <- err
-			return
-		}
-
-		// setup successful,
-		ready <- nil
-
+		ready <- struct{}{}
 		d.conn, err = d.server.Accept()
+
 		timeout := make(chan struct{})
 		defer close(timeout)
 		go func() { time.Sleep(3 * time.Minute); <-timeout }()
@@ -185,14 +191,11 @@ func (d *DataWorker) createPasv() Response {
 		}
 	}()
 
-	if err := <-ready; err != nil {
-		return CannotOpenDataConnection
-	}
-
-	return PassiveMode
+	<-ready
+	return GeneratePassiveResponse(port)
 }
 
-func (d *DataWorker) createPort(req *Request) Response {
+func (d *DataWorker) active(req *Request) Response {
 	ready := make(chan error)
 	d.connection = make(chan struct {
 		socket net.Conn

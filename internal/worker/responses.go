@@ -1,9 +1,22 @@
 package worker
 
+import "fmt"
+
 type Response string
 
 func (r Response) Byte() []byte {
 	return append([]byte(r), []byte(CRLF)...)
+}
+
+// TODO: eventually take in host name
+func GeneratePassiveResponse(port uint16) Response {
+	var MSB uint16
+	var LSB uint16
+
+	LSB = port & uint16(0x00FF)
+	MSB = (port >> 8) & uint16(0x00FF)
+
+	return Response(fmt.Sprintf("227 Entering Passive Mode (127,0,0,1,%d,%d)", MSB, LSB))
 }
 
 const (
@@ -26,7 +39,6 @@ const (
 const (
 	CommandOK         Response = "200 Command okay"
 	ServiceReady      Response = "220 Service Ready"
-	PassiveMode       Response = "227 Entering Passive Mode (127,0,0,1,7,232)" // 127.0.0.1:2024
 	UserQuit          Response = "221 Service closing control connection"
 	UserLoggedIn      Response = "230 User logged in, proceed"
 	TransferComplete  Response = "250 Requested file action okay, completed"
