@@ -165,7 +165,11 @@ func (c *ControlWorker) Responder(ctx context.Context) {
 				c.logger.Infof("Responder: forcing shutdown")
 				return
 			}
-			c.connection.Write(resp.Byte())
+			_, err := c.connection.Write(resp.Byte())
+			if err != nil {
+				c.logger.Infof("Responder: Writeback to connection failed, initiating shutdown")
+				return
+			}
 			if resp == UserQuit {
 				return
 			}
@@ -177,14 +181,22 @@ func (c *ControlWorker) Responder(ctx context.Context) {
 				}
 				return
 			case resp := <-pipe:
-				c.connection.Write(resp.Byte())
+				_, err := c.connection.Write(resp.Byte())
 				c.IExecutingState.SetCMD(None)
+				if err != nil {
+					c.logger.Infof("Responder: Writeback to connection failed, initiating shutdown")
+					return
+				}
 			case resp := <-c.generalRespond:
 				if resp == ForcedShutDown {
 					c.logger.Infof("Responder: Received Forced Shutdown")
 					return
 				}
-				c.connection.Write(resp.Byte())
+				_, err := c.connection.Write(resp.Byte())
+				if err != nil {
+					c.logger.Infof("Responder: Writeback to connection failed, initiating shutdown")
+					return
+				}
 				if resp == UserQuit {
 					return
 				}

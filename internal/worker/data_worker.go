@@ -186,7 +186,7 @@ retry:
 			err    error
 		}{d.conn, err}:
 		case timeout <- struct{}{}:
-			d.logger.Infof("Data Worker: Timout waiting for data connection to be used, shutting down")
+			d.logger.Infof("DataWorker: Timout waiting for data connection to be used, shutting down")
 			d.disconnect()
 		}
 	}()
