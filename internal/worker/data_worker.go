@@ -12,16 +12,15 @@ import (
 	"time"
 )
 
+// Each DataWorker handles a single transfer request
+// access to it is controlled by the ControlWorker which
+// does the appropriate configuration/setup before use
 type DataWorker struct {
-	// store references to both networking resources
-	// to close them when needed
 	server net.Listener
 	conn   net.Conn
 	//
 	// channel used to communicate with subsequent go routine
 	// spawned to handler ~ Store, Retrieve, List, ... etc
-	//
-	// from invocation in w.Start(...) in ClientWorker
 	connection chan struct {
 		socket net.Conn
 		err    error
@@ -31,7 +30,6 @@ type DataWorker struct {
 
 	host string
 	port uint16
-
 	pasv bool
 
 	// data worker is configured to work with s specific
@@ -39,6 +37,8 @@ type DataWorker struct {
 	transferReq  *Request
 	transferType string
 
+	// unused at the moment, idea is the generate a r/w based off of configurations
+	// to be used in Pipe(..)
 	*TransferFactory
 }
 
@@ -96,7 +96,7 @@ func (d *DataWorker) Pipe(resp chan Response, file func(string) (*os.File, error
 		defer func() {
 			d.disconnect()
 			close(resp)
-			d.logger.Infof("Closing Data Connection")
+			d.logger.Infof("DataWorker: Closing Data Connection")
 		}()
 
 		if d.transferReq == nil {
@@ -186,7 +186,7 @@ retry:
 			err    error
 		}{d.conn, err}:
 		case timeout <- struct{}{}:
-			d.logger.Infof("Timout waiting for data connection to be used, shutting down")
+			d.logger.Infof("Data Worker: Timout waiting for data connection to be used, shutting down")
 			d.disconnect()
 		}
 	}()
@@ -237,7 +237,7 @@ func (d *DataWorker) active(req *Request) Response {
 			err    error
 		}{d.conn, nil}:
 		case timeout <- struct{}{}:
-			d.logger.Infof("Timout waiting for data connection to be used, shutting down")
+			d.logger.Infof("DataWorker: Timout waiting for data connection to be used, shutting down")
 			d.disconnect()
 		}
 	}()

@@ -3,7 +3,7 @@ var fs = require('fs');
 var process = require('process')
 var c = new Client();
 
-let file = 'main.txt'
+let file = 'hello.txt'
 
 c.on('ready', function () {
     c.get(file, function (err, stream) {

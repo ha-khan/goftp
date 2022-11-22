@@ -1,6 +1,7 @@
 # Overview
+A minimal Go implementation of [RFC 959](https://www.rfc-editor.org/rfc/rfc959).
 
-A pure Go implementation of [RFC 959](https://www.rfc-editor.org/rfc/rfc959)
+Project mainly exists to practice/use/study the interesting parts of Go (server-side network programming). 
 
 ```
    5.1.  MINIMUM IMPLEMENTATION
@@ -24,5 +25,18 @@ A pure Go implementation of [RFC 959](https://www.rfc-editor.org/rfc/rfc959)
          STRU - File
 
       All hosts must accept the above as the standard defaults.
+```
 
+# How to use
+```bash
+
+# in a set up shell, cd to project root
+mkdir temp
+
+echo "hello world!" > ./temp/hello.txt
+
+go run ./cmd/main.go
+
+# in another shell
+source ./scripts/curl.sh
 ```

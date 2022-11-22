@@ -181,7 +181,7 @@ func (c *ControlWorker) Responder(ctx context.Context) {
 				c.IExecutingState.SetCMD(None)
 			case resp := <-c.generalRespond:
 				if resp == ForcedShutDown {
-					c.logger.Infof("Received Forced Shutdown")
+					c.logger.Infof("Responder: Received Forced Shutdown")
 					return
 				}
 				c.connection.Write(resp.Byte())

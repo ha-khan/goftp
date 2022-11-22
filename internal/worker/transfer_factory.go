@@ -30,8 +30,7 @@ type TransferFactory struct {
 }
 
 func (t *TransferFactory) Create(fd *os.File) (io.ReadWriteCloser, error) {
-	// TODO:
-	// ideally user fields Mode, Type, Structure to
+	// TODO: use fields Mode, Type, Structure to
 	// generate specific to those params ReadWriter
 	// and return that to caller
 	// need to change interface to io.ReadWriter
