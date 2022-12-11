@@ -2,8 +2,16 @@ package worker
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 )
+
+var pattern *regexp.Regexp
+
+func init() {
+	// potentially match against CMDs, Args
+	pattern = regexp.MustCompile("\r\n")
+}
 
 type Request struct {
 	Cmd string
@@ -16,16 +24,20 @@ func (r *Request) String() string {
 
 func (c *ControlWorker) Parse(request string) (Handler, *Request, error) {
 	var req *Request
-	// FIXME: parse logic is weak, assumes correct input protocol
-	switch str := strings.Split(request, " "); len(str) {
+	if !pattern.Match([]byte(request)) {
+		return c.handleSyntaxErrorParams, req, fmt.Errorf("Request format is incorrect")
+	}
+
+	parsed := strings.Split(request, " ")
+	switch len(parsed) {
 	case 2:
 		req = &Request{
-			Cmd: strings.ToUpper(string(str[0])),
-			Arg: string(str[1][:len(str[1])-2]),
+			Cmd: strings.ToUpper(string(parsed[0])),
+			Arg: string(parsed[1][:len(parsed[1])-2]),
 		}
 	case 1:
 		req = &Request{
-			Cmd: string(str[0][:len(str[0])-2]),
+			Cmd: string(parsed[0][:len(parsed[0])-2]),
 		}
 	default:
 		return c.handleSyntaxErrorParams, req, fmt.Errorf("Unable to parse request")
@@ -60,7 +72,7 @@ func (c *ControlWorker) Parse(request string) (Handler, *Request, error) {
 	case "LIST", "ACCT", "CWD", "CDUP", "SMNT", "REIN", "HELP",
 		"STRU", "STOU", "APPE", "ALLO", "REST", "RNFR", "RNTO",
 		"ABOR", "RMD", "MKD", "NLST", "SITE", "SYST", "STAT", "DELE":
-		handler = c.handleCmdNotImplemented
+		return c.handleCmdNotImplemented, req, fmt.Errorf("CMD Not Implementd: %v", req.Cmd)
 	default:
 		return c.handleSyntaxErrorInvalidCmd, req, fmt.Errorf("Invalid CMD: %s", req.Cmd)
 	}
