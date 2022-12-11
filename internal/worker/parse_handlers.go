@@ -16,6 +16,7 @@ func (r *Request) String() string {
 
 func (c *ControlWorker) Parse(request string) (Handler, *Request, error) {
 	var req *Request
+	// FIXME: parse logic is weak, assumes correct input protocol
 	switch str := strings.Split(request, " "); len(str) {
 	case 2:
 		req = &Request{
