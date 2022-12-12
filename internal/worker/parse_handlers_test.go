@@ -7,6 +7,8 @@ import (
 	"testing"
 )
 
+// TODO: add fuzzing
+
 func Test_Parse_Format_Error(t *testing.T) {
 	_, server := net.Pipe()
 	w := NewControlWorker(logger.NewStdStreamClient(), server)
@@ -34,8 +36,8 @@ func Test_Parse_CMD_Not_Implemented(t *testing.T) {
 	// if the cmd is recognized by RFC 959, but we're not implementing it,
 	// that shouldn't return an error
 	handler, req, err := w.Parse("SMNT\r\n")
-	if err != nil {
-		t.Errorf("Expected nil error, but got %v", err)
+	if err == nil {
+		t.Errorf("Expected not nil error")
 	}
 
 	resp, err := handler(req)

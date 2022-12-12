@@ -115,6 +115,7 @@ func (c *ControlWorker) Receiver() {
 		handler, req, err := c.Parse(string(buffer))
 		if err != nil {
 			c.logger.Infof(fmt.Sprintf("Receiver: parsing error: %v", err))
+			goto handle
 		}
 
 		if reject := c.IExecutingState.CheckCMD(req); reject {
@@ -123,6 +124,7 @@ func (c *ControlWorker) Receiver() {
 			}
 		}
 
+	handle:
 		resp, err := handler(req)
 		if err != nil {
 			c.logger.Infof(fmt.Sprintf("Receiver: handler error: %v", err))
