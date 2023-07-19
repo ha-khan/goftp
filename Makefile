@@ -1,5 +1,8 @@
 container_work_dir = /go/src/app
 
+test:
+	go test ./internal/worker -v
+
 run:
 	docker-compose up
 
