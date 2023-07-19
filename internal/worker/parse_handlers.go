@@ -27,7 +27,7 @@ func (c *ControlWorker) Parse(request string) (Handler, *Request, error) {
 			Cmd: string(str[0][:len(str[0])-2]),
 		}
 	default:
-		return c.handleSyntaxErrorParams, req, fmt.Errorf("Unable to parse request")
+		return c.handleSyntaxErrorParams, &Request{}, fmt.Errorf("Unable to parse request")
 	}
 
 	c.logger.Infof(req.String())
