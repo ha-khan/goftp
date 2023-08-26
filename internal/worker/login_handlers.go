@@ -8,7 +8,7 @@ func (c ControlWorker) checkIfLoggedIn(fn Handler) Handler {
 			return fn(req)
 		}
 
-		c.logger.Infof(fmt.Sprintf("client not authenticated to run CMD"))
+		c.logger.Info(fmt.Sprintf("client not authenticated to run CMD"))
 		return NotLoggedIn, nil
 	}
 }
@@ -19,7 +19,7 @@ func (c *ControlWorker) handleUserLogin(req *Request) (Response, error) {
 	}
 
 	if _, ok := c.users[req.Arg]; !ok {
-		c.logger.Infof(fmt.Sprintf("username: %s, not recognized", req.Arg))
+		c.logger.Info(fmt.Sprintf("username: %s, not recognized", req.Arg))
 		return NotLoggedIn, nil
 	}
 
@@ -36,7 +36,7 @@ func (c *ControlWorker) handleUserPassword(req *Request) (Response, error) {
 		}
 	}
 
-	c.logger.Infof(fmt.Sprintf("incorrect password received for username %s", c.currentUser))
+	c.logger.Info(fmt.Sprintf("incorrect password received for username %s", c.currentUser))
 	return NotLoggedIn, nil
 }
 

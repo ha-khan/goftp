@@ -96,7 +96,7 @@ func (d *DataWorker) Pipe(resp chan Response, file func(string) (*os.File, error
 		defer func() {
 			d.disconnect()
 			close(resp)
-			d.logger.Infof("DataWorker: Closing Data Connection")
+			d.logger.Info("DataWorker: Closing Data Connection")
 		}()
 
 		if d.transferReq == nil {
@@ -186,7 +186,7 @@ retry:
 			err    error
 		}{d.conn, err}:
 		case timeout <- struct{}{}:
-			d.logger.Infof("DataWorker: Timout waiting for data connection to be used, shutting down")
+			d.logger.Info("DataWorker: Timout waiting for data connection to be used, shutting down")
 			d.disconnect()
 		}
 	}()
@@ -237,7 +237,7 @@ func (d *DataWorker) active(req *Request) Response {
 			err    error
 		}{d.conn, nil}:
 		case timeout <- struct{}{}:
-			d.logger.Infof("DataWorker: Timout waiting for data connection to be used, shutting down")
+			d.logger.Info("DataWorker: Timout waiting for data connection to be used, shutting down")
 			d.disconnect()
 		}
 	}()

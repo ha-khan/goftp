@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"goftp/internal/logger"
 	"goftp/internal/worker"
+	"log"
 	"net"
 	"sync"
 	"time"
@@ -30,25 +31,25 @@ func New(log logger.Client) *Dispatcher {
 // Start kicks off the reactor loop that handles each control connections initiated by some ftp client
 // a new ControlWorker instance will handle the LCM of that connection
 func (d *Dispatcher) Start() {
-	d.logger.Infof("Dispatcher starting up...")
+	d.logger.Info("Dispatcher starting up...")
 
 	var err error
 	d.server, err = net.Listen("tcp", ":2023")
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	d.shutdown = cancel
 	for {
-		d.logger.Infof("Dispatcher waiting for connections")
+		d.logger.Info("Dispatcher waiting for connections")
 
 		conn, err := d.server.Accept()
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) {
 				return
 			}
-			d.logger.Infof(fmt.Sprintf("Dispatcher connection error: %v", err))
+			d.logger.Info(fmt.Sprintf("Dispatcher connection error: %v", err))
 			continue
 		}
 
@@ -71,7 +72,7 @@ func (d *Dispatcher) Start() {
 //
 // there can be future enhancements to wait for a transfer to complete in a given timeout
 func (d *Dispatcher) Stop() {
-	d.logger.Infof("Dispatcher shutting down...")
+	d.logger.Info("Dispatcher shutting down...")
 	d.server.Close()
 	d.shutdown()
 
@@ -84,9 +85,9 @@ func (d *Dispatcher) Stop() {
 	timeout := time.Tick(5 * time.Minute)
 	select {
 	case <-timeout:
-		d.logger.Infof("Timeout received for shutdown, exiting")
+		d.logger.Info("Timeout received for shutdown, exiting")
 	case <-done:
-		d.logger.Infof("Shutdown done, exiting")
+		d.logger.Info("Shutdown done, exiting")
 	}
-	d.logger.Infof("Dispatcher shutdown complete")
+	d.logger.Info("Dispatcher shutdown complete")
 }

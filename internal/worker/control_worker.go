@@ -105,7 +105,7 @@ func (c *ControlWorker) Receiver() {
 		buffer, err := reader.ReadBytes('\n')
 		if err != nil {
 			if !errors.Is(err, net.ErrClosed) {
-				c.logger.Infof(fmt.Sprintf("Receiver: read error: %v", err))
+				c.logger.Info(fmt.Sprintf("Receiver: read error: %v", err))
 			}
 
 			c.generalRespond <- ForcedShutDown
@@ -114,7 +114,7 @@ func (c *ControlWorker) Receiver() {
 
 		handler, req, err := c.Parse(string(buffer))
 		if err != nil {
-			c.logger.Infof(fmt.Sprintf("Receiver: parsing error: %v", err))
+			c.logger.Info(fmt.Sprintf("Receiver: parsing error: %v", err))
 			goto handle
 		}
 
@@ -127,7 +127,7 @@ func (c *ControlWorker) Receiver() {
 	handle:
 		resp, err := handler(req)
 		if err != nil {
-			c.logger.Infof(fmt.Sprintf("Receiver: handler error: %v", err))
+			c.logger.Info(fmt.Sprintf("Receiver: handler error: %v", err))
 		}
 
 		switch c.generalRespond <- resp; resp {
@@ -150,7 +150,7 @@ func (c *ControlWorker) Responder(ctx context.Context) {
 	defer func() {
 		c.IDataWorker.Stop()
 		c.connection.Close()
-		c.logger.Infof("Responder: closing control connection")
+		c.logger.Info("Responder: closing control connection")
 	}()
 
 	for {
@@ -164,12 +164,12 @@ func (c *ControlWorker) Responder(ctx context.Context) {
 			return
 		case resp := <-c.generalRespond:
 			if resp == ForcedShutDown {
-				c.logger.Infof("Responder: forcing shutdown")
+				c.logger.Info("Responder: forcing shutdown")
 				return
 			}
 			_, err := c.connection.Write(resp.Byte())
 			if err != nil {
-				c.logger.Infof("Responder: Writeback to connection failed, initiating shutdown")
+				c.logger.Info("Responder: Writeback to connection failed, initiating shutdown")
 				return
 			}
 			if resp == UserQuit {
@@ -186,17 +186,17 @@ func (c *ControlWorker) Responder(ctx context.Context) {
 				_, err := c.connection.Write(resp.Byte())
 				c.IExecutingState.SetCMD(None)
 				if err != nil {
-					c.logger.Infof("Responder: Writeback to connection failed, initiating shutdown")
+					c.logger.Info("Responder: Writeback to connection failed, initiating shutdown")
 					return
 				}
 			case resp := <-c.generalRespond:
 				if resp == ForcedShutDown {
-					c.logger.Infof("Responder: Received Forced Shutdown")
+					c.logger.Info("Responder: Received Forced Shutdown")
 					return
 				}
 				_, err := c.connection.Write(resp.Byte())
 				if err != nil {
-					c.logger.Infof("Responder: Writeback to connection failed, initiating shutdown")
+					c.logger.Info("Responder: Writeback to connection failed, initiating shutdown")
 					return
 				}
 				if resp == UserQuit {

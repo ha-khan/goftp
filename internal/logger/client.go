@@ -4,5 +4,5 @@ package logger
 // interfaces defined below, can create specific "drivers"
 // that route logs to streams other than std
 type Client interface {
-	Infof(string)
+	Info(string, ...any)
 }

@@ -43,7 +43,7 @@ func (c *ControlWorker) Parse(request string) (Handler, *Request, error) {
 		return c.handleSyntaxErrorParams, &Request{}, fmt.Errorf("Unable to parse request")
 	}
 
-	c.logger.Infof(req.String())
+	c.logger.Info(req.String())
 
 	var handler Handler
 	switch req.Cmd {

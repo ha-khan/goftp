@@ -1,34 +1,18 @@
 package logger
 
 import (
-	"log"
+	"log/slog"
 	"os"
 	"sync"
 )
 
 var once sync.Once
-var stdClient *stdStreamClient
+var stdClient *slog.Logger
 
-func NewStdStreamClient() *stdStreamClient {
+func NewStdStreamClient() Client {
 	once.Do(func() {
-		stdClient = &stdStreamClient{
-			Logger: log.New(os.Stdout, "goftp", 1),
-		}
+		stdClient = slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	})
 
 	return stdClient
-}
-
-// writes to standard streams ~ stdout, stderr
-type stdStreamClient struct {
-	*log.Logger
-}
-
-func (s *stdStreamClient) SetLevel() {
-	s.Infof("Setting level to ...")
-}
-
-// Infof ...
-func (s *stdStreamClient) Infof(msg string) {
-	s.Println(msg)
 }
