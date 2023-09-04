@@ -1,3 +1,3 @@
 #!/bin/bash
 
-curl --user hkhan:password ftp://localhost:2023/hello.txt
+curl ftp://hkhan:password@127.0.0.1:2023/hello.txt
