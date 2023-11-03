@@ -43,26 +43,19 @@ type ControlWorker struct {
 	// ControlWorkers can be put into a state that forces a subsequent
 	// command to match a specific one, mainly for data transfers
 	// also protects against malicious FTP Clients
-	IExecutingState interface {
-		CheckCMD(*Request) bool
-		SetCMD(CMD)
-		GetCMD() CMD
-	}
+	*Command
 
 	// There is a 1-to-1 relation with a DataWorker which handles all
 	// the data transfer interactions, the ControlWorker signals to the
 	// DataWorker when/what transfer should be done
-	IDataWorker interface {
+	DataWorker interface {
+		// orchestrates DataWorker
 		Start(chan Response)
 		Stop()
-		SetTransferRequest(*Request)
 		Connect(*Request) Response
-	}
 
-	// Data transfers can be configured and requires some "Factory" like
-	// object to construct the appropriate Reader/Writer, depending on the
-	// configurations set
-	ITransferFactory interface {
+		// configures the type of transfer
+		SetTransferRequest(*Request)
 		SetPWD(string)
 		GetPWD() string
 		SetStructure(rune)
@@ -73,18 +66,16 @@ type ControlWorker struct {
 }
 
 func NewControlWorker(l logger.Client, conn net.Conn) *ControlWorker {
-	dw := NewDataWorker(l)
 	return &ControlWorker{
 		logger: l,
 		users: map[string]string{
 			"hkhan": "password",
 		},
-		IExecutingState:  NewExecutingState(),
-		IDataWorker:      dw,
-		ITransferFactory: dw,
-		connection:       conn,
-		dtpRespond:       make(chan chan Response, 2),
-		generalRespond:   make(chan Response, 2),
+		Command:        NewCommand(),
+		DataWorker:     NewDataWorker(l),
+		connection:     conn,
+		dtpRespond:     make(chan chan Response, 2),
+		generalRespond: make(chan Response, 2),
 	}
 }
 
@@ -118,7 +109,7 @@ func (c *ControlWorker) Receiver() {
 			goto handle
 		}
 
-		if reject := c.IExecutingState.CheckCMD(req); reject {
+		if reject := c.Command.Check(req); reject {
 			handler = func(r *Request) (Response, error) {
 				return BadSequence, nil
 			}
@@ -136,7 +127,7 @@ func (c *ControlWorker) Receiver() {
 		case StartTransfer:
 			pipe := make(chan Response, 2)
 			c.dtpRespond <- pipe
-			c.IDataWorker.Start(pipe)
+			c.DataWorker.Start(pipe)
 		default:
 			// pass through to next cmd since no "special" processing is required
 		}
@@ -148,7 +139,7 @@ func (c *ControlWorker) Receiver() {
 // if the app is shutting down
 func (c *ControlWorker) Responder(ctx context.Context) {
 	defer func() {
-		c.IDataWorker.Stop()
+		c.DataWorker.Stop()
 		c.connection.Close()
 		c.logger.Info("Responder: closing control connection")
 	}()
@@ -156,7 +147,7 @@ func (c *ControlWorker) Responder(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			if c.IExecutingState.GetCMD() != None {
+			if c.Command.Get() != None {
 				c.connection.Write(TransferAborted.Byte())
 			} else {
 				c.connection.Write(ServiceNotAvailable.Byte())
@@ -178,13 +169,13 @@ func (c *ControlWorker) Responder(ctx context.Context) {
 		case pipe := <-c.dtpRespond:
 			select {
 			case <-ctx.Done():
-				if c.IExecutingState.GetCMD() != None {
+				if c.Command.Get() != None {
 					c.connection.Write(TransferAborted.Byte())
 				}
 				return
 			case resp := <-pipe:
 				_, err := c.connection.Write(resp.Byte())
-				c.IExecutingState.SetCMD(None)
+				c.Command.Set(None)
 				if err != nil {
 					c.logger.Info("Responder: Writeback to connection failed, initiating shutdown")
 					return

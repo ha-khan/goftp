@@ -5,7 +5,7 @@ import (
 )
 
 func (c ControlWorker) handlePWD(req *Request) (Response, error) {
-	return Response(fmt.Sprintf(string(DirectoryResponse), c.ITransferFactory.GetPWD())), nil
+	return Response(fmt.Sprintf(string(DirectoryResponse), c.DataWorker.GetPWD())), nil
 }
 
 func (c ControlWorker) handleNoop(req *Request) (Response, error) {
@@ -50,7 +50,7 @@ func (c *ControlWorker) handleType(req *Request) (Response, error) {
 		return CmdNotImplementedForParam, nil
 	}
 
-	c.ITransferFactory.SetType(symbol)
+	c.DataWorker.SetType(symbol)
 	return CommandOK, nil
 }
 
@@ -79,7 +79,7 @@ func (c *ControlWorker) handleMode(req *Request) (Response, error) {
 		return CmdNotImplementedForParam, nil
 	}
 
-	c.ITransferFactory.SetMode(symbol)
+	c.DataWorker.SetMode(symbol)
 	return CommandOK, nil
 }
 
@@ -108,11 +108,11 @@ func (c *ControlWorker) handleStrucure(req *Request) (Response, error) {
 		return CmdNotImplementedForParam, nil
 	}
 
-	if symbol == 'R' && c.ITransferFactory.GetType() != 'A' {
+	if symbol == 'R' && c.DataWorker.GetType() != 'A' {
 		return CmdNotImplementedForParam, nil
 	}
 
-	c.ITransferFactory.SetStructure(symbol)
+	c.DataWorker.SetStructure(symbol)
 	return CommandOK, nil
 }
 
@@ -124,7 +124,7 @@ func (c *ControlWorker) handleStrucure(req *Request) (Response, error) {
 //	450, 550
 //	500, 501, 502, 421, 530
 func (c *ControlWorker) handleDelete(req *Request) (Response, error) {
-	c.IExecutingState.SetCMD(Delete)
+	c.Command.Set(Delete)
 	return TransferComplete, nil
 }
 
@@ -149,8 +149,8 @@ DATA PORT (PORT)
 	address.
 */
 func (c *ControlWorker) handlePort(req *Request) (Response, error) {
-	c.IExecutingState.SetCMD(Port)
-	return c.IDataWorker.Connect(req), nil
+	c.Command.Set(Port)
+	return c.DataWorker.Connect(req), nil
 }
 
 /*
@@ -168,8 +168,8 @@ PASSIVE (PASV)
 	character string representation).
 */
 func (c *ControlWorker) handlePassive(req *Request) (Response, error) {
-	c.IExecutingState.SetCMD(Pasv)
-	return c.IDataWorker.Connect(req), nil
+	c.Command.Set(Pasv)
+	return c.DataWorker.Connect(req), nil
 }
 
 // RETR
@@ -181,8 +181,8 @@ func (c *ControlWorker) handlePassive(req *Request) (Response, error) {
 //	450, 550
 //	500, 501, 421, 530
 func (c *ControlWorker) handleRetrieve(req *Request) (Response, error) {
-	c.IExecutingState.SetCMD(Retrieve)
-	c.IDataWorker.SetTransferRequest(req)
+	c.Command.Set(Retrieve)
+	c.DataWorker.SetTransferRequest(req)
 
 	return StartTransfer, nil
 }
@@ -196,8 +196,8 @@ func (c *ControlWorker) handleRetrieve(req *Request) (Response, error) {
 //	532, 450, 452, 553
 //	500, 501, 421, 530
 func (c *ControlWorker) handleStore(req *Request) (Response, error) {
-	c.IExecutingState.SetCMD(Store)
-	c.IDataWorker.SetTransferRequest(req)
+	c.Command.Set(Store)
+	c.DataWorker.SetTransferRequest(req)
 
 	return StartTransfer, nil
 }

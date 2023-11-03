@@ -43,7 +43,7 @@ func (c *ControlWorker) handleUserPassword(req *Request) (Response, error) {
 func (c *ControlWorker) handleReinitialize(req *Request) (Response, error) {
 	c.currentUser = ""
 	c.loggedIn = false
-	return Response(fmt.Sprintf(string(DirectoryResponse), c.ITransferFactory.GetPWD())), nil
+	return Response(fmt.Sprintf(string(DirectoryResponse), c.DataWorker.GetPWD())), nil
 }
 
 func (c ControlWorker) handleQuit(req *Request) (Response, error) {

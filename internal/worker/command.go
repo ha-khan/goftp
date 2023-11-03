@@ -50,7 +50,7 @@ var table = map[CMD]map[CMD]any{
 	},
 }
 
-type ExecutingState struct {
+type Command struct {
 	// current executing state
 	cmd CMD
 
@@ -59,8 +59,8 @@ type ExecutingState struct {
 	mutex sync.Locker
 }
 
-func NewExecutingState() *ExecutingState {
-	return &ExecutingState{
+func NewCommand() *Command {
+	return &Command{
 		cmd:        None,
 		stateTable: table,
 		mutex:      new(sync.Mutex),
@@ -75,22 +75,22 @@ func NewExecutingState() *ExecutingState {
 // eventually return the worker to an "idle" state.
 //
 // configuration and other lcm commands are however still accepted,
-func (e *ExecutingState) CheckCMD(requested *Request) bool {
-	e.mutex.Lock()
-	defer e.mutex.Unlock()
-	_, reject := table[e.cmd][CMD(requested.Cmd)]
+func (c *Command) Check(requested *Request) bool {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	_, reject := table[c.cmd][CMD(requested.Cmd)]
 
 	return reject
 }
 
-func (e *ExecutingState) SetCMD(cmd CMD) {
-	e.mutex.Lock()
-	defer e.mutex.Unlock()
-	e.cmd = cmd
+func (c *Command) Set(cmd CMD) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	c.cmd = cmd
 }
 
-func (e *ExecutingState) GetCMD() CMD {
-	e.mutex.Lock()
-	defer e.mutex.Unlock()
-	return e.cmd
+func (c *Command) Get() CMD {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	return c.cmd
 }
