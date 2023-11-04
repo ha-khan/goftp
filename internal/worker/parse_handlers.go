@@ -25,7 +25,7 @@ func (r *Request) String() string {
 func (c *ControlWorker) Parse(request string) (Handler, *Request, error) {
 	var req *Request
 	if !pattern.Match([]byte(request)) {
-		return c.handleSyntaxErrorParams, req, fmt.Errorf("Request format is incorrect")
+		return c.handleSyntaxErrorParams, req, fmt.Errorf("request format is incorrect")
 	}
 
 	parsed := strings.Split(request, " ")
@@ -40,7 +40,7 @@ func (c *ControlWorker) Parse(request string) (Handler, *Request, error) {
 			Cmd: string(parsed[0][:len(parsed[0])-2]),
 		}
 	default:
-		return c.handleSyntaxErrorParams, &Request{}, fmt.Errorf("Unable to parse request")
+		return c.handleSyntaxErrorParams, &Request{Cmd: "UNKNOWN", Arg: "UNKNOWN"}, fmt.Errorf("unable to parse request")
 	}
 
 	c.logger.Info(req.String())
@@ -74,7 +74,7 @@ func (c *ControlWorker) Parse(request string) (Handler, *Request, error) {
 		"ABOR", "RMD", "MKD", "NLST", "SITE", "SYST", "STAT", "DELE":
 		return c.handleCmdNotImplemented, req, fmt.Errorf("CMD Not Implementd: %v", req.Cmd)
 	default:
-		return c.handleSyntaxErrorInvalidCmd, req, fmt.Errorf("Invalid CMD: %s", req.Cmd)
+		return c.handleSyntaxErrorInvalidCmd, req, fmt.Errorf("invalid CMD: %s", req.Cmd)
 	}
 
 	return c.checkIfLoggedIn(handler), req, nil

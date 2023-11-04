@@ -60,7 +60,7 @@ func Test_Parse_Invalid_Cmd(t *testing.T) {
 		t.Errorf("Expected not nil error")
 	}
 
-	if !strings.Contains(err.Error(), "Invalid CMD:") {
+	if !strings.Contains(err.Error(), "invalid CMD:") {
 		t.Errorf("Expected error message to contain 'Invalid CMD:'")
 	}
 
