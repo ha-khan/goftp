@@ -1,10 +1,19 @@
+networks:
+  main:
+    driver: bridge
+    name: "main"
 volumes:
   core:
 services:
     goftp:
-        image: goftp/prod:latest
-        ports: 
-            - 2023:2023
-        volumes:
-          - core:/go/src/app/temp
-          
+      image: goftp/prod:latest
+      volumes:
+        - core:/go/src/app/temp
+      networks:
+        - main
+    tester:
+      image: tester:latest
+      networks:
+        - main
+      depends_on:
+        - goftp

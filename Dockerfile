@@ -1,4 +1,4 @@
-FROM golang:1.19 as go-build
+FROM golang:1.21 as go-build
 
 WORKDIR /go/src/app
 
@@ -6,7 +6,7 @@ COPY . ./
 
 RUN make build-binary
 
-FROM alpine:3.15
+FROM alpine:3.18
 
 WORKDIR /go/src/app
 
