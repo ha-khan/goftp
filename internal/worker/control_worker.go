@@ -34,8 +34,8 @@ type ControlWorker struct {
 	// across the Control Connection
 	// buffered channels are used mainly to avoid blocking on
 	// shutdown scenarios
-	dtpRespond     chan chan Response
-	generalRespond chan Response
+	dataWorkerResponse    chan chan Response
+	controlWorkerResponse chan Response
 
 	// connection with FTP Client (Control Connection)
 	connection net.Conn
@@ -43,7 +43,7 @@ type ControlWorker struct {
 	// ControlWorkers can be put into a state that forces a subsequent
 	// command to match a specific one, mainly for data transfers
 	// also protects against malicious FTP Clients
-	*Command
+	state *State
 
 	// There is a 1-to-1 relation with a DataWorker which handles all
 	// the data transfer interactions, the ControlWorker signals to the
@@ -71,11 +71,11 @@ func NewControlWorker(l logger.Client, conn net.Conn) *ControlWorker {
 		users: map[string]string{
 			"hkhan": "password",
 		},
-		Command:        NewCommand(),
-		DataWorker:     NewDataWorker(l),
-		connection:     conn,
-		dtpRespond:     make(chan chan Response, 2),
-		generalRespond: make(chan Response, 2),
+		state:                 NewState(),
+		DataWorker:            NewDataWorker(l),
+		connection:            conn,
+		dataWorkerResponse:    make(chan chan Response, 2),
+		controlWorkerResponse: make(chan Response, 2),
 	}
 }
 
@@ -87,11 +87,11 @@ func NewControlWorker(l logger.Client, conn net.Conn) *ControlWorker {
 // such as the actual transfer of bytes across the data connection
 func (c *ControlWorker) Receiver() {
 	defer func() {
-		close(c.generalRespond)
-		close(c.dtpRespond)
+		close(c.controlWorkerResponse)
+		close(c.dataWorkerResponse)
 	}()
 
-	c.generalRespond <- ServiceReady
+	c.controlWorkerResponse <- ServiceReady
 	for reader := bufio.NewReader(c.connection); ; {
 		buffer, err := reader.ReadBytes('\n')
 		if err != nil {
@@ -99,7 +99,7 @@ func (c *ControlWorker) Receiver() {
 				c.logger.Info(fmt.Sprintf("Receiver: read error: %v", err))
 			}
 
-			c.generalRespond <- ForcedShutDown
+			c.controlWorkerResponse <- ForcedShutDown
 			return
 		}
 
@@ -109,7 +109,7 @@ func (c *ControlWorker) Receiver() {
 			goto handle
 		}
 
-		if reject := c.Command.Check(req); reject {
+		if reject := c.state.Check(req); reject {
 			handler = func(r *Request) (Response, error) {
 				return BadSequence, nil
 			}
@@ -121,12 +121,12 @@ func (c *ControlWorker) Receiver() {
 			c.logger.Info(fmt.Sprintf("Receiver: handler error: %v", err))
 		}
 
-		switch c.generalRespond <- resp; resp {
+		switch c.controlWorkerResponse <- resp; resp {
 		case UserQuit:
 			return
 		case StartTransfer:
 			pipe := make(chan Response, 2)
-			c.dtpRespond <- pipe
+			c.dataWorkerResponse <- pipe
 			c.DataWorker.Start(pipe)
 		default:
 			// pass through to next cmd since no "special" processing is required
@@ -147,13 +147,13 @@ func (c *ControlWorker) Responder(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			if c.Command.Get() != None {
+			if c.state.Get() != None {
 				c.connection.Write(TransferAborted.Byte())
 			} else {
 				c.connection.Write(ServiceNotAvailable.Byte())
 			}
 			return
-		case resp := <-c.generalRespond:
+		case resp := <-c.controlWorkerResponse:
 			if resp == ForcedShutDown {
 				c.logger.Info("Responder: forcing shutdown")
 				return
@@ -166,21 +166,22 @@ func (c *ControlWorker) Responder(ctx context.Context) {
 			if resp == UserQuit {
 				return
 			}
-		case pipe := <-c.dtpRespond:
+		case pipe := <-c.dataWorkerResponse:
+		transfer:
 			select {
 			case <-ctx.Done():
-				if c.Command.Get() != None {
+				if c.state.Get() != None {
 					c.connection.Write(TransferAborted.Byte())
 				}
 				return
 			case resp := <-pipe:
 				_, err := c.connection.Write(resp.Byte())
-				c.Command.Set(None)
+				c.state.Set(None)
 				if err != nil {
 					c.logger.Info("Responder: Writeback to connection failed, initiating shutdown")
 					return
 				}
-			case resp := <-c.generalRespond:
+			case resp := <-c.controlWorkerResponse:
 				if resp == ForcedShutDown {
 					c.logger.Info("Responder: Received Forced Shutdown")
 					return
@@ -193,6 +194,7 @@ func (c *ControlWorker) Responder(ctx context.Context) {
 				if resp == UserQuit {
 					return
 				}
+				goto transfer
 			}
 		}
 	}

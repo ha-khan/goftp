@@ -50,32 +50,31 @@ var table = map[CMD]map[CMD]any{
 	},
 }
 
-type Command struct {
+type State struct {
 	// current executing state
 	cmd CMD
 
-	stateTable map[CMD]map[CMD]any
+	table map[CMD]map[CMD]any
 
 	mutex sync.Locker
 }
 
-func NewCommand() *Command {
-	return &Command{
-		cmd:        None,
-		stateTable: table,
-		mutex:      new(sync.Mutex),
+func NewState() *State {
+	return &State{
+		cmd:   None,
+		table: table,
+		mutex: new(sync.Mutex),
 	}
 }
 
-// check whether the given request + current state will allow for handler to
-// be invoked
+// check whether the given request + current state will allow for handler to be invoked
 //
 // forces a sequence when Port/Pasv is invoked, signaling that the next
 // operation should be some kind of data transfer (Store/Retrieve), which would
 // eventually return the worker to an "idle" state.
 //
 // configuration and other lcm commands are however still accepted,
-func (c *Command) Check(requested *Request) bool {
+func (c *State) Check(requested *Request) bool {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	_, reject := table[c.cmd][CMD(requested.Cmd)]
@@ -83,13 +82,13 @@ func (c *Command) Check(requested *Request) bool {
 	return reject
 }
 
-func (c *Command) Set(cmd CMD) {
+func (c *State) Set(cmd CMD) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	c.cmd = cmd
 }
 
-func (c *Command) Get() CMD {
+func (c *State) Get() CMD {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	return c.cmd

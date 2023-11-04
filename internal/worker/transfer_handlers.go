@@ -124,7 +124,7 @@ func (c *ControlWorker) handleStrucure(req *Request) (Response, error) {
 //	450, 550
 //	500, 501, 502, 421, 530
 func (c *ControlWorker) handleDelete(req *Request) (Response, error) {
-	c.Command.Set(Delete)
+	c.state.Set(Delete)
 	return TransferComplete, nil
 }
 
@@ -149,7 +149,7 @@ DATA PORT (PORT)
 	address.
 */
 func (c *ControlWorker) handlePort(req *Request) (Response, error) {
-	c.Command.Set(Port)
+	c.state.Set(Port)
 	return c.DataWorker.Connect(req), nil
 }
 
@@ -168,7 +168,7 @@ PASSIVE (PASV)
 	character string representation).
 */
 func (c *ControlWorker) handlePassive(req *Request) (Response, error) {
-	c.Command.Set(Pasv)
+	c.state.Set(Pasv)
 	return c.DataWorker.Connect(req), nil
 }
 
@@ -181,7 +181,7 @@ func (c *ControlWorker) handlePassive(req *Request) (Response, error) {
 //	450, 550
 //	500, 501, 421, 530
 func (c *ControlWorker) handleRetrieve(req *Request) (Response, error) {
-	c.Command.Set(Retrieve)
+	c.state.Set(Retrieve)
 	c.DataWorker.SetTransferRequest(req)
 
 	return StartTransfer, nil
@@ -196,7 +196,7 @@ func (c *ControlWorker) handleRetrieve(req *Request) (Response, error) {
 //	532, 450, 452, 553
 //	500, 501, 421, 530
 func (c *ControlWorker) handleStore(req *Request) (Response, error) {
-	c.Command.Set(Store)
+	c.state.Set(Store)
 	c.DataWorker.SetTransferRequest(req)
 
 	return StartTransfer, nil
