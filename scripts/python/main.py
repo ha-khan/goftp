@@ -4,7 +4,7 @@ import io
 
 if __name__ == '__main__':
     with FTP() as client:
-        client.connect('localhost', 2023)
+        client.connect('goftp', 2023)
         client.login('hkhan', 'password')
         client.voidcmd("NOOP")
         with io.BytesIO(bytes(b'Go is fun and cool')) as fp:
