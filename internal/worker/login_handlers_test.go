@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"context"
 	"goftp/internal/logger"
 	"net"
 	"testing"
@@ -73,7 +74,7 @@ func TestDriver(t *testing.T) {
 	for _, testcase := range accessControlTestCases {
 		t.Run(testcase.TestName, func(t *testing.T) {
 			_, server := net.Pipe()
-			w := NewControlWorker(logger.NewStdStreamClient(), server)
+			w := NewControlWorker(context.Background(), logger.NewStdStreamClient(), server)
 			testcase.MutationFunc(w)
 			handler, req, err := w.Parse(testcase.Command)
 			if err != nil {

@@ -74,12 +74,16 @@ func NewState() *State {
 // eventually return the worker to an "idle" state.
 //
 // configuration and other lcm commands are however still accepted,
-func (c *State) Check(requested *Request) bool {
+func (c *State) Check(requested *Request, handler Handler) Handler {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	_, reject := table[c.cmd][CMD(requested.Cmd)]
+	if _, reject := table[c.cmd][CMD(requested.Cmd)]; reject {
+		return func(r *Request) (Response, error) {
+			return BadSequence, nil
+		}
+	}
 
-	return reject
+	return handler
 }
 
 func (c *State) Set(cmd CMD) {

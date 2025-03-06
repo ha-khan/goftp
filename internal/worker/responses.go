@@ -8,6 +8,10 @@ func (r Response) Byte() []byte {
 	return append([]byte(r), []byte(CRLF)...)
 }
 
+func (r Response) String() string {
+	return string(r.Byte())
+}
+
 // TODO: eventually take in host name
 func GeneratePassiveResponse(port uint16) Response {
 	var MSB uint16

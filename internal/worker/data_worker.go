@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"context"
 	"fmt"
 	"goftp/internal/logger"
 	"io"
@@ -16,6 +17,10 @@ import (
 // access to it is controlled by the ControlWorker which
 // does the appropriate configuration/setup before use
 type DataWorker struct {
+	ctx  context.Context
+	resp chan Response
+
+	// TODO: combine these into a single object
 	server net.Listener
 	conn   net.Conn
 	//
@@ -42,8 +47,10 @@ type DataWorker struct {
 	*TransferFactory
 }
 
-func NewDataWorker(logger logger.Client) *DataWorker {
+func NewDataWorker(ctx context.Context, logger logger.Client) *DataWorker {
 	return &DataWorker{
+		ctx:             ctx,
+		resp:            make(chan Response),
 		logger:          logger,
 		TransferFactory: NewDefaultTransferFactory(),
 	}
@@ -54,17 +61,21 @@ func (d *DataWorker) SetTransferRequest(req *Request) {
 	d.transferReq = req
 }
 
-func (d *DataWorker) Start(resp chan Response) {
-	if d.transferType == "RETR" {
-		d.Pipe(resp, os.Open)
-	} else if d.transferType == "STOR" {
-		d.Pipe(resp, os.Create)
-	}
+func (d *DataWorker) Read() <-chan Response {
+	return d.resp
 }
 
 // disconnect any open connections and
 func (d *DataWorker) Stop() {
 	d.disconnect()
+}
+
+func (d *DataWorker) Start() {
+	if d.transferType == "RETR" {
+		d.Pipe(d.resp, os.Open)
+	} else if d.transferType == "STOR" {
+		d.Pipe(d.resp, os.Create)
+	}
 }
 
 func (d *DataWorker) Connect(req *Request) Response {
@@ -95,7 +106,6 @@ func (d *DataWorker) Pipe(resp chan Response, file func(string) (*os.File, error
 	go func() {
 		defer func() {
 			d.disconnect()
-			close(resp)
 			d.logger.Info("DataWorker: Closing Data Connection")
 		}()
 
@@ -105,7 +115,7 @@ func (d *DataWorker) Pipe(resp chan Response, file func(string) (*os.File, error
 		}
 
 		// TODO: eventually use TransferFactory.Create(..)
-		fd, err := file("./" + d.GetPWD() + "/" + d.transferReq.Arg)
+		fd, err := file("." + d.GetPWD() + "/" + d.transferReq.Arg)
 		if err != nil {
 			resp <- FileNotFound
 			return

@@ -9,11 +9,13 @@ import (
 )
 
 func Test_Start_And_Quit(t *testing.T) {
-	client, server := net.Pipe()
-	worker := NewControlWorker(logger.NewStdStreamClient(), server)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	go worker.Receiver()
-	go worker.Responder(context.TODO())
+	client, server := net.Pipe()
+	worker := NewControlWorker(ctx, logger.NewStdStreamClient(), server)
+
+	go worker.Start()
 
 	scanner := bufio.NewScanner(client)
 	writer := bufio.NewWriter(client)
@@ -36,13 +38,13 @@ func Test_Start_And_Quit(t *testing.T) {
 }
 
 func Test_Start_And_OS_Shutdown(t *testing.T) {
-	client, server := net.Pipe()
-	worker := NewControlWorker(logger.NewStdStreamClient(), server)
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go worker.Receiver()
-	go worker.Responder(ctx)
+
+	client, server := net.Pipe()
+	worker := NewControlWorker(ctx, logger.NewStdStreamClient(), server)
+
+	go worker.Start()
 
 	scanner := bufio.NewScanner(client)
 	scanner.Scan()
@@ -50,6 +52,8 @@ func Test_Start_And_OS_Shutdown(t *testing.T) {
 		t.Errorf("Expected: %s, but got %s", string(ServiceReady), resp)
 		return
 	}
+
+	// force shutdown
 	cancel()
 
 	scanner.Scan()
@@ -60,11 +64,13 @@ func Test_Start_And_OS_Shutdown(t *testing.T) {
 }
 
 func Test_User_Login(t *testing.T) {
-	client, server := net.Pipe()
-	worker := NewControlWorker(logger.NewStdStreamClient(), server)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	go worker.Receiver()
-	go worker.Responder(context.TODO())
+	client, server := net.Pipe()
+	worker := NewControlWorker(ctx, logger.NewStdStreamClient(), server)
+
+	go worker.Start()
 
 	scanner := bufio.NewScanner(client)
 	writer := bufio.NewWriter(client)

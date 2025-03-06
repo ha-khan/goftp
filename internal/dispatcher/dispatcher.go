@@ -53,14 +53,10 @@ func (d *Dispatcher) Start() {
 			continue
 		}
 
-		worker := worker.NewControlWorker(d.logger, conn)
-		d.wg.Add(2)
+		worker := worker.NewControlWorker(ctx, d.logger, conn)
+		d.wg.Add(1)
 		go func() {
-			worker.Receiver()
-			d.wg.Done()
-		}()
-		go func() {
-			worker.Responder(ctx)
+			worker.Start()
 			d.wg.Done()
 		}()
 	}

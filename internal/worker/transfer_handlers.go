@@ -5,7 +5,7 @@ import (
 )
 
 func (c ControlWorker) handlePWD(req *Request) (Response, error) {
-	return Response(fmt.Sprintf(string(DirectoryResponse), c.DataWorker.GetPWD())), nil
+	return Response(fmt.Sprintf(string(DirectoryResponse), c.dataWorker.GetPWD())), nil
 }
 
 func (c ControlWorker) handleNoop(req *Request) (Response, error) {
@@ -50,7 +50,7 @@ func (c *ControlWorker) handleType(req *Request) (Response, error) {
 		return CmdNotImplementedForParam, nil
 	}
 
-	c.DataWorker.SetType(symbol)
+	c.dataWorker.SetType(symbol)
 	return CommandOK, nil
 }
 
@@ -79,7 +79,7 @@ func (c *ControlWorker) handleMode(req *Request) (Response, error) {
 		return CmdNotImplementedForParam, nil
 	}
 
-	c.DataWorker.SetMode(symbol)
+	c.dataWorker.SetMode(symbol)
 	return CommandOK, nil
 }
 
@@ -108,11 +108,11 @@ func (c *ControlWorker) handleStrucure(req *Request) (Response, error) {
 		return CmdNotImplementedForParam, nil
 	}
 
-	if symbol == 'R' && c.DataWorker.GetType() != 'A' {
+	if symbol == 'R' && c.dataWorker.GetType() != 'A' {
 		return CmdNotImplementedForParam, nil
 	}
 
-	c.DataWorker.SetStructure(symbol)
+	c.dataWorker.SetStructure(symbol)
 	return CommandOK, nil
 }
 
@@ -150,7 +150,7 @@ DATA PORT (PORT)
 */
 func (c *ControlWorker) handlePort(req *Request) (Response, error) {
 	c.state.Set(Port)
-	return c.DataWorker.Connect(req), nil
+	return c.dataWorker.Connect(req), nil
 }
 
 /*
@@ -169,7 +169,7 @@ PASSIVE (PASV)
 */
 func (c *ControlWorker) handlePassive(req *Request) (Response, error) {
 	c.state.Set(Pasv)
-	return c.DataWorker.Connect(req), nil
+	return c.dataWorker.Connect(req), nil
 }
 
 // RETR
@@ -182,8 +182,8 @@ func (c *ControlWorker) handlePassive(req *Request) (Response, error) {
 //	500, 501, 421, 530
 func (c *ControlWorker) handleRetrieve(req *Request) (Response, error) {
 	c.state.Set(Retrieve)
-	c.DataWorker.SetTransferRequest(req)
-
+	c.dataWorker.SetTransferRequest(req)
+	c.dataWorker.Start()
 	return StartTransfer, nil
 }
 
@@ -197,7 +197,7 @@ func (c *ControlWorker) handleRetrieve(req *Request) (Response, error) {
 //	500, 501, 421, 530
 func (c *ControlWorker) handleStore(req *Request) (Response, error) {
 	c.state.Set(Store)
-	c.DataWorker.SetTransferRequest(req)
-
+	c.dataWorker.SetTransferRequest(req)
+	c.dataWorker.Start()
 	return StartTransfer, nil
 }

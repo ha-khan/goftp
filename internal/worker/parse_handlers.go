@@ -40,7 +40,7 @@ func (c *ControlWorker) Parse(request string) (Handler, *Request, error) {
 			Cmd: string(parsed[0][:len(parsed[0])-2]),
 		}
 	default:
-		return c.handleSyntaxErrorParams, &Request{Cmd: "UNKNOWN", Arg: "UNKNOWN"}, fmt.Errorf("unable to parse request")
+		return c.handleSyntaxErrorParams, &Request{}, fmt.Errorf("unable to parse request")
 	}
 
 	c.logger.Info(req.String())

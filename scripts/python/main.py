@@ -4,7 +4,7 @@ import io
 
 if __name__ == '__main__':
     with FTP() as client:
-        client.connect('goftp', 2023)
+        client.connect('localhost', 2023)
         client.login('hkhan', 'password')
         client.voidcmd("NOOP")
         with io.BytesIO(bytes(b'Go is fun and cool')) as fp:
@@ -16,3 +16,4 @@ if __name__ == '__main__':
         client.retrlines('RETR hello.txt')
         # with io.BytesIO(bytes(b'hello world')) as fp:
         #     client.storlines("STOR main.txt", fp)
+        client.retrlines('RETR main.txt')
