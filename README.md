@@ -33,10 +33,10 @@ Project mainly exists to practice/use/study the interesting parts of Go (server-
 # in a set up shell, cd to project root
 mkdir temp
 
-echo "hello world!" > ./temp/hello.txt
+echo "hello world\!" > ./temp/hello.txt
 
-go run ./cmd/main.go
+go run ./cmd/goftp/main.go
 
 # in another shell
-source ./scripts/curl.sh
+source ./scripts/curl/curl.sh
 ```
