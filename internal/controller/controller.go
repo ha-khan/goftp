@@ -14,7 +14,7 @@ type GoFTP struct {
 	dispatcher *dispatcher.Dispatcher
 }
 
-func BasicGoFTP() *GoFTP {
+func NewGoFTP() *GoFTP {
 	once.Do(func() {
 		logger := logger.NewStdStreamClient()
 		goFtp = &GoFTP{
