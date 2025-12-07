@@ -8,9 +8,24 @@ import (
 	"goftp/internal/worker"
 	"log"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 )
+
+func WithLogger(l logger.Client) func(*Dispatcher) {
+	return func(d *Dispatcher) {
+		d.logger = l
+	}
+}
+
+func WithPort(p int) func(*Dispatcher) {
+	return func(d *Dispatcher) {
+		d.port = ":" + strconv.Itoa(p)
+	}
+}
+
+type Options func(*Dispatcher)
 
 // Dispatcher will handle all control connections initiated against the FTP Server
 type Dispatcher struct {
@@ -21,11 +36,18 @@ type Dispatcher struct {
 	wg       *sync.WaitGroup
 }
 
-func New(log logger.Client) *Dispatcher {
-	return &Dispatcher{
-		logger: log,
+func New(options ...Options) *Dispatcher {
+	d := &Dispatcher{
+		logger: logger.NewStdStreamClient(),
 		wg:     new(sync.WaitGroup),
+		port:   ":2023",
 	}
+
+	for _, option := range options {
+		option(d)
+	}
+
+	return d
 }
 
 // Start kicks off the reactor loop that handles each control connections initiated by some ftp client
@@ -34,7 +56,7 @@ func (d *Dispatcher) Start() {
 	d.logger.Info("Dispatcher starting up...")
 
 	var err error
-	d.server, err = net.Listen("tcp", ":2023")
+	d.server, err = net.Listen("tcp", d.port)
 	if err != nil {
 		log.Fatal(err)
 	}

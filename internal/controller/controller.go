@@ -17,9 +17,13 @@ type GoFTP struct {
 func NewGoFTP() *GoFTP {
 	once.Do(func() {
 		logger := logger.NewStdStreamClient()
+
 		goFtp = &GoFTP{
-			logger:     logger,
-			dispatcher: dispatcher.New(logger),
+			logger: logger,
+			dispatcher: dispatcher.New(
+				dispatcher.WithLogger(logger),
+				dispatcher.WithPort(2023),
+			),
 		}
 	})
 
