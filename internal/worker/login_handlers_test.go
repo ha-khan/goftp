@@ -11,35 +11,35 @@ import (
 // https://go.dev/blog/subtests
 var accessControlTestCases = []struct {
 	TestName         string
-	Command          string
+	Command          []byte
 	MutationFunc     func(w *ControlWorker)
 	HandlerErrCheck  func(e error, t *testing.T)
 	HandlerRespValue Response
 }{
 	{
 		TestName:         "Test_User_Success",
-		Command:          "USER hkhan\r\n",
+		Command:          []byte("USER hkhan\r\n"),
 		MutationFunc:     noMutation,
 		HandlerErrCheck:  expectNilErr,
 		HandlerRespValue: UserOkNeedPW,
 	},
 	{
 		TestName:         "Test_User_Already_Logged_In",
-		Command:          "USER hkhan\r\n",
+		Command:          []byte("USER hkhan\r\n"),
 		MutationFunc:     setUserLoggedIn,
 		HandlerErrCheck:  expectNilErr,
 		HandlerRespValue: UserLoggedIn,
 	},
 	{
 		TestName:         "Test_User_Username_Not_Recognized",
-		Command:          "USER hakhan\r\n",
+		Command:          []byte("USER hakhan\r\n"),
 		MutationFunc:     noMutation,
 		HandlerErrCheck:  expectNilErr,
 		HandlerRespValue: NotLoggedIn,
 	},
 	{
 		TestName: "Test_User_Password_Incorrect",
-		Command:  "PASS password123\r\n",
+		Command:  []byte("PASS password123\r\n"),
 		MutationFunc: func(w *ControlWorker) {
 			w.currentUser = "hkhan"
 		},
@@ -48,7 +48,7 @@ var accessControlTestCases = []struct {
 	},
 	{
 		TestName: "Test_User_Password_Incorrect",
-		Command:  "PASS password\r\n",
+		Command:  []byte("PASS password\r\n"),
 		MutationFunc: func(w *ControlWorker) {
 			w.currentUser = "hkhan"
 		},

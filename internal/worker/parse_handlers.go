@@ -1,9 +1,9 @@
 package worker
 
 import (
+	"bytes"
 	"fmt"
 	"regexp"
-	"strings"
 )
 
 var pattern *regexp.Regexp
@@ -22,17 +22,17 @@ func (r *Request) String() string {
 	return fmt.Sprintf("%s %s", r.Cmd, r.Arg)
 }
 
-func (c *ControlWorker) Parse(request string) (Handler, *Request, error) {
+func (c *ControlWorker) Parse(request []byte) (Handler, *Request, error) {
 	var req *Request
-	if !pattern.Match([]byte(request)) {
+	if !pattern.Match(request) {
 		return c.handleSyntaxErrorParams, req, fmt.Errorf("request format is incorrect")
 	}
 
-	parsed := strings.Split(request, " ")
+	parsed := bytes.Split(request, []byte(" "))
 	switch len(parsed) {
 	case 2:
 		req = &Request{
-			Cmd: strings.ToUpper(string(parsed[0])),
+			Cmd: string(bytes.ToUpper(parsed[0])),
 			Arg: string(parsed[1][:len(parsed[1])-2]),
 		}
 	case 1:
@@ -71,7 +71,7 @@ func (c *ControlWorker) Parse(request string) (Handler, *Request, error) {
 		return c.handleQuit, req, nil
 	case "LIST", "ACCT", "CWD", "CDUP", "SMNT", "REIN", "HELP",
 		"STRU", "STOU", "APPE", "ALLO", "REST", "RNFR", "RNTO",
-		"ABOR", "RMD", "MKD", "NLST", "SITE", "SYST", "STAT", "DELE":
+		"ABOR", "RMD", "MKD", "NLST", "SITE", "SYST", "STAT", "DELE", "EPSV":
 		return c.handleCmdNotImplemented, req, fmt.Errorf("CMD Not Implementd: %v", req.Cmd)
 	default:
 		return c.handleSyntaxErrorInvalidCmd, req, fmt.Errorf("invalid CMD: %s", req.Cmd)

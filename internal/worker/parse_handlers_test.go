@@ -14,7 +14,7 @@ func Test_Parse_Format_Error(t *testing.T) {
 	_, server := net.Pipe()
 	w := NewControlWorker(context.Background(), logger.NewStdStreamClient(), server)
 
-	handler, req, err := w.Parse("abcd efg nhijk lmnop\r\n")
+	handler, req, err := w.Parse([]byte("abcd efg nhijk lmnop\r\n"))
 	if err == nil {
 		t.Errorf("Expected not nil error")
 	}
@@ -36,7 +36,7 @@ func Test_Parse_CMD_Not_Implemented(t *testing.T) {
 
 	// if the cmd is recognized by RFC 959, but we're not implementing it,
 	// that shouldn't return an error
-	handler, req, err := w.Parse("SMNT\r\n")
+	handler, req, err := w.Parse([]byte("SMNT\r\n"))
 	if err == nil {
 		t.Errorf("Expected not nil error")
 	}
@@ -56,7 +56,7 @@ func Test_Parse_Invalid_Cmd(t *testing.T) {
 	_, server := net.Pipe()
 	w := NewControlWorker(context.Background(), logger.NewStdStreamClient(), server)
 
-	handler, req, err := w.Parse("EPSV\r\n")
+	handler, req, err := w.Parse([]byte("EPSV\r\n"))
 	if err == nil {
 		t.Errorf("Expected not nil error")
 	}

@@ -108,7 +108,7 @@ func (c *ControlWorker) Start() {
 			}
 		}
 
-		handler, req, err := c.Parse(string(payload.Data))
+		handler, req, err := c.Parse(payload.Data)
 		if err != nil {
 			c.logger.Info(fmt.Sprintf("Receiver: parsing error: %v", err))
 		}
